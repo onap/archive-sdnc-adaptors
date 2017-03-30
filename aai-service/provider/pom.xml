@@ -110,7 +110,14 @@
 
 	<build>
 		<plugins>
-
+                        <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-compiler-plugin</artifactId>
+                                <configuration>
+                                        <source>1.7</source>
+                                        <target>1.7</target>
+                                </configuration>
+                        </plugin>
 
 			<plugin>
 				<groupId>org.apache.felix</groupId>
@@ -121,10 +128,8 @@
 					<instructions>
 						<Bundle-SymbolicName>org.openecomp.sdnc.sli.aai</Bundle-SymbolicName>
 						<Bundle-Activator>org.openecomp.sdnc.sli.aai.AAIServiceActivator</Bundle-Activator>
-						<Export-Package>org.openecomp.sdnc.sli.aai.*,inventory.aai.sdnc.openecomp.org.v8.*</Export-Package>
-                                                <Import-Package>org.openecomp.sdnc.sli.*,org.osgi.framework.*,org.slf4j.*,org.apache.commons.lang3.*,javax.xml.bind.annotation.*,javax.ws.rs.*,javax.ws.rs.core.*,com.fasterxml.jackson.module.jaxb.*,com.sun.jersey.client.urlconnection.*,com.sun.jersey.api.client.config.*,com.fasterxml.jackson.databind.type.*,com.fasterxml.jackson.module.jaxb.*,com.fasterxml.jackson.databind.introspect.*,com.fasterxml.jackson.annotation.*,com.fasterxml.jackson.databind.*</Import-Package>
-						<!-- <Import-Package>org.openecomp.sdnc.sli.*,org.osgi.framework.*,org.slf4j.*</Import-Package> -->
-						<!-- <Embed-Dependency>*;scope=compile|runtime;artifactId=!sli-common|org.eclipse.osgi|slf4j-api|jcl-over-slf4j|mysql-connector-java|xml-apis</Embed-Dependency> -->
+						<Export-Package>org.openecomp.sdnc.sli.aai.*,inventory.aai.sdnc.openecomp.org.*</Export-Package>
+                        <Import-Package>org.openecomp.sdnc.sli.*,org.osgi.framework.*,org.slf4j.*,org.apache.commons.lang3.*,javax.xml.bind.annotation.*,javax.ws.rs.*,javax.ws.rs.core.*,com.fasterxml.jackson.module.jaxb.*,com.sun.jersey.client.urlconnection.*,com.sun.jersey.api.client.config.*,com.fasterxml.jackson.databind.type.*,com.fasterxml.jackson.module.jaxb.*,com.fasterxml.jackson.databind.introspect.*,com.fasterxml.jackson.annotation.*,com.fasterxml.jackson.databind.*</Import-Package>
 						<Import-Package>*</Import-Package>
 						<Embed-Transitive>true</Embed-Transitive>
 					</instructions>

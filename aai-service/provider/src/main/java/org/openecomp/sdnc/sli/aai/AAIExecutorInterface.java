@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,9 @@
 package org.openecomp.sdnc.sli.aai;
 
 public interface AAIExecutorInterface {
-	Object get(AAIRequest request) throws AAIServiceException;
-	Object post(AAIRequest request) throws AAIServiceException;
-	Boolean delete(AAIRequest request, String resourceVersion) throws AAIServiceException;
-	Object query(AAIRequest request, Class clas) throws AAIServiceException;
+	public Object get(AAIRequest request) throws AAIServiceException;
+	public Object post(AAIRequest request) throws AAIServiceException;
+	public Boolean delete(AAIRequest request, String resourceVersion) throws AAIServiceException;
+	public Object query(AAIRequest request, Class clas) throws AAIServiceException;
+	public Boolean patch(AAIRequest request, String resourceVersion) throws AAIServiceException;
 }
