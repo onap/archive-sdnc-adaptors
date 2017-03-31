@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,10 @@ import java.util.regex.Pattern;
 
 import javax.xml.bind.annotation.XmlType;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.openecomp.sdnc.sli.SvcLogicContext;
 import org.openecomp.sdnc.sli.SvcLogicException;
 import org.openecomp.sdnc.sli.aai.AAIService.AAIRequestExecutor;
@@ -52,17 +55,12 @@ import org.openecomp.sdnc.sli.aai.query.InstanceFilters;
 import org.openecomp.sdnc.sli.aai.query.NamedQuery;
 import org.openecomp.sdnc.sli.aai.query.NamedQueryData;
 import org.openecomp.sdnc.sli.aai.query.QueryParameters;
-import org.openecomp.sdnc.sli.aai.update.Action;
-import org.openecomp.sdnc.sli.aai.update.ActionDatum;
-import org.openecomp.sdnc.sli.aai.update.Update;
-import org.openecomp.sdnc.sli.aai.update.UpdateNodeKey;
-import org.slf4j.Logger;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.openecomp.aai.inventory.v8.GenericVnf;
 import org.openecomp.aai.inventory.v8.InventoryResponseItem;
 import org.openecomp.aai.inventory.v8.InventoryResponseItems;
+import org.openecomp.aai.inventory.v8.L3Network;
 import org.openecomp.aai.inventory.v8.LogicalLink;
 import org.openecomp.aai.inventory.v8.Metadata;
 import org.openecomp.aai.inventory.v8.Metadatum;
@@ -72,6 +70,7 @@ import org.openecomp.aai.inventory.v8.RelationshipData;
 import org.openecomp.aai.inventory.v8.RelationshipList;
 import org.openecomp.aai.inventory.v8.ResultData;
 import org.openecomp.aai.inventory.v8.SearchResults;
+import org.openecomp.aai.inventory.v8.ServiceInstance;
 import org.openecomp.aai.inventory.v8.Vlan;
 import org.openecomp.aai.inventory.v8.Vlans;
 import org.openecomp.aai.inventory.v8.Vserver;
@@ -84,10 +83,11 @@ public abstract class AAIDeclarations implements AAIClient {
 	public static final String KEYSTORE_PATH      = "org.openecomp.sdnc.sli.aai.ssl.key";
 	public static final String KEYSTORE_PSSWD     = "org.openecomp.sdnc.sli.aai.ssl.key.psswd";
 
+	public static final String APPLICATION_ID     = "org.openecomp.sdnc.sli.aai.application";
+
 	public static final String CLIENT_NAME		  = "org.openecomp.sdnc.sli.aai.client.name";
 	public static final String CLIENT_PWWD		  = "org.openecomp.sdnc.sli.aai.client.psswd";
 
-	public static final String APPLICATION_ID     = "org.openecomp.sdnc.sli.aai.application";
 
 	public static final String CONNECTION_TIMEOUT = "connection.timeout";
 	public static final String READ_TIMEOUT 	  = "read.timeout";
@@ -100,49 +100,13 @@ public abstract class AAIDeclarations implements AAIClient {
 	// Update
 	public static final String UPDATE_PATH		  = "org.openecomp.sdnc.sli.aai.update";
 
-	// VCE
-	public static final String NETWORK_VCE_PATH   = "org.openecomp.sdnc.sli.aai.path.vce";
-
-	// VPE
-	public static final String NETWORK_VPE_PATH   = "org.openecomp.sdnc.sli.aai.path.vpe";
-
-	// VPLS-PE
-	public static final String NETWORK_VPLS_PE_PATH = "org.openecomp.sdnc.sli.aai.path.vpls.pe";
-
 	// Service instance
 	public static final String SVC_INSTANCE_PATH  = "org.openecomp.sdnc.sli.aai.path.svcinst";
 	public static final String SVC_INST_QRY_PATH  = "org.openecomp.sdnc.sli.aai.path.svcinst.query";
 
-	// customer
-	public static final String CUSTOMER_PATH  = "org.openecomp.sdnc.sli.aai.path.customer";
-
-	// Complexes
-	public static final String NETWORK_COMPLEX_PATH   = "org.openecomp.sdnc.sli.aai.path.complex";
-
-	// PServer
-	public static final String NETWORK_PSERVER_PATH  = "org.openecomp.sdnc.sli.aai.path.pserver";
-
 	// VServer
 	public static final String NETWORK_VSERVER_PATH  = "org.openecomp.sdnc.sli.aai.path.vserver";
 
-	// DVS Seitch
-	public static final String NETWORK_DVSSWITCH_PATH  = "org.openecomp.sdnc.sli.aai.path.dvsswitch";
-
-	// GENERIC VNF
-	public static final String GENERIC_VNF_PATH       = "org.openecomp.sdnc.sli.aai.path.generic.vnf";
-
-	// CTAG Pool
-	public static final String CTAG_POOLS_PATH        = "org.openecomp.sdnc.sli.aai.path.ctag.pools";
-	public static final String CTAG_POOL_PATH         = "org.openecomp.sdnc.sli.aai.path.ctag.pool";
-
-	// L3 Network
-	public static final String L3_NETWORK_PATH        = "org.openecomp.sdnc.sli.aai.path.l3network";
-	public static final String L3_NETWORK_PATH_QUERY_NAME  = "org.openecomp.sdnc.sli.aai.path.l3network.query.name";
-
-	// VPN Bindings
-	public static final String VPN_BINDING_PATH       = "org.openecomp.sdnc.sli.aai.path.vpn.binding";
-
-	public static final String VNF_IMAGE_PATH 		  = "org.openecomp.sdnc.sli.aai.path.vnf.image";
 	public static final String VNF_IMAGE_QUERY_PATH	  = "org.openecomp.sdnc.sli.aai.path.vnf.image.query";
 
 	public static final String QUERY_FORMAT           = "org.openecomp.sdnc.sli.aai.param.format";
@@ -161,9 +125,6 @@ public abstract class AAIDeclarations implements AAIClient {
 
 	// P-Interfaces
 	public static final String P_INTERFACE_PATH       = "org.openecomp.sdnc.sli.aai.path.pserver.pinterface";
-
-	// Physical Link
-	public static final String PHYSICAL_LINK_PATH     = "org.openecomp.sdnc.sli.aai.path.physical.link";
 
 	// site-pair-sets
 	public static final String SITE_PAIR_SET_PATH     = "org.openecomp.sdnc.sli.aai.path.site.pair.set";
@@ -187,15 +148,25 @@ public abstract class AAIDeclarations implements AAIClient {
 		HashMap<String, String> nameValues = keyToHashMap(key, ctx);
 		getLogger().debug("key = "+ nameValues.toString());
 
+		if(!checkOldFormat(resource, nameValues)) {
+			ctx.setAttribute(String.format("%s.error.message", prefix), String.format("Resource %s is not supported. Key string contains invaid identifiers", resource));
+			return QueryStatus.FAILURE;
+		}
+
+		if(resource == null || resource.isEmpty() || AAIRequest.createRequest(resource, nameValues) == null) {
+			ctx.setAttribute(String.format("%s.error.message", prefix), String.format("Resource %s is not supported", resource));
+			return QueryStatus.FAILURE;
+		}
+
 		// process data using new model
 		boolean useNewModelProcessing = true;
 		// process server query by name the old way
 		if(("vserver".equals(resource) || "vserver2".equals(resource))){
-			if(nameValues.containsKey("vserver_name") || nameValues.containsKey("vserver-name"))
+			if(nameValues.containsKey("vserver_name") || nameValues.containsKey("vserver-name") || nameValues.containsKey("vserver.vserver_name") || nameValues.containsKey("vserver.vserver-name"))
 				useNewModelProcessing = false;
 		}
 		if("generic-vnf".equals(resource)){
-			if(nameValues.containsKey("vnf_name") || nameValues.containsKey("vnf-name"))
+			if(nameValues.containsKey("vnf_name") || nameValues.containsKey("vnf-name") || nameValues.containsKey("generic_vnf.vnf_name") || nameValues.containsKey("generic-vnf.vnf-name"))
 				useNewModelProcessing = false;
 		}
 
@@ -210,7 +181,7 @@ public abstract class AAIDeclarations implements AAIClient {
 			}
 		}
 
-		ObjectMapper mapper = getObjectMapper();
+		ObjectMapper mapper = AAIService.getObjectMapper();
 		Map<String,Object> attributes = new HashMap<String,Object>();
 
 		String modifier = null;
@@ -230,7 +201,16 @@ public abstract class AAIDeclarations implements AAIClient {
 			switch(resource) {
 				case "generic_vnf":
 					vnfId = nameValues.get("vnf_id");
-					vnfName = nameValues.get("vnf_name");
+					if(nameValues.containsKey("vnf_id"))
+						vnfId = nameValues.get("vnf_id");
+					else if(nameValues.containsKey("generic_vnf.vnf_name"))
+						vnfId = nameValues.get("generic_vnf.vserver_name");
+
+					if(nameValues.containsKey("vnf_name"))
+						vnfName = nameValues.get("vnf_name");
+					else if(nameValues.containsKey("generic_vnf.vnf_name"))
+						vnfName = nameValues.get("generic_vnf.vnf_name");
+
 					if(vnfId != null && !vnfId.isEmpty()) {
 						// at this point of the project this part should not be executed
 						vnfId = vnfId.trim().replace("'", "").replace("$", "").replace("'", "");
@@ -273,45 +253,78 @@ public abstract class AAIDeclarations implements AAIClient {
 					break;
 				case "vserver":
 				case "vserver2":
-					String vserverName = nameValues.get("vserver_name");
-					String vserverId = nameValues.get("vserver_id");
+					String vserverName = null;
+					if(nameValues.containsKey("vserver_name"))
+						vserverName = nameValues.get("vserver_name");
+					else if(nameValues.containsKey("vserver.vserver_name"))
+						vserverName = nameValues.get("vserver.vserver_name");
+
+					String vserverId = null;
+					if(nameValues.containsKey("vserver_id"))
+						vserverId = nameValues.get("vserver_id");
+					if(nameValues.containsKey("vserver.vserver_id"))
+						vserverId = nameValues.get("vserver.vserver_id");
 					String tenantId = nameValues.get("teannt_id");
 
 					if(vserverName != null) vserverName = vserverName.trim().replace("'", "").replace("$", "").replace("'", "");
 					if(vserverId != null) vserverId = vserverId.trim().replace("'", "").replace("$", "").replace("'", "");
 					if(tenantId != null) tenantId = tenantId.trim().replace("'", "").replace("$", "").replace("'", "");
 
-					if(vserverName != null) {
-						try {
-//							 add cloud region to return data
-							URL vserverUrl = this.requestVserverURLNodeQuery(vserverName);
-							if(vserverUrl == null) {
-								return QueryStatus.NOT_FOUND;
-							}
-
-							tenantId = getTenantIdFromVserverUrl(vserverUrl);
-							String cloudOwner = getCloudOwnerFromVserverUrl(vserverUrl);
-							String cloudRegionId = getCloudRegionFromVserverUrl(vserverUrl);
-
-							Vserver vserver = this.requestVServerDataByURL(vserverUrl);
-							if(vserver == null) {
-								return QueryStatus.NOT_FOUND;
-							}
-							attributes = mapper.convertValue(vserver, attributes.getClass());
-							if(!attributes.containsKey("tenant-id") && tenantId != null){
-								attributes.put("tenant-id", tenantId);
-							}
-							if(!attributes.containsKey("cloud-owner") && cloudOwner != null){
-								attributes.put("cloud-owner", cloudOwner);
-							}
-							if(!attributes.containsKey("cloud-region-id") && cloudRegionId != null){
-								attributes.put("cloud-region-id", cloudRegionId);
-							}
-						} catch (AAIServiceException e) {
-							getLogger().warn("Caught exception trying to refresh generic VNF", e);
+				if (vserverName != null) {
+					URL vserverUrl = null;
+					try {
+						vserverUrl = this.requestVserverURLNodeQuery(vserverName);
+					} catch (AAIServiceException aaiexc) {
+						ctx.setAttribute(prefix + ".error.message", aaiexc.getMessage());
+						if (aaiexc.getReturnCode() >= 300) {
+							ctx.setAttribute(prefix + ".error.http.response-code", "" + aaiexc.getReturnCode());
 						}
-					} else	if(vserverId != null && tenantId != null) {
-						Vserver vserver = this.requestVServerData(tenantId, vserverId, "att-aic", "AAIAIC25");
+
+						if (aaiexc.getReturnCode() == 404)
+							return QueryStatus.NOT_FOUND;
+						else
+							return QueryStatus.FAILURE;
+					}
+					if (vserverUrl == null) {
+						return QueryStatus.NOT_FOUND;
+					}
+
+					tenantId = getTenantIdFromVserverUrl(vserverUrl);
+					String cloudOwner = nameValues.get("cloud_region.cloud_owner");
+					String cloudRegionId = nameValues.get("cloud_region.cloud_region_id");
+
+					Vserver vserver = null;
+					try {
+						vserver = this.requestVServerDataByURL(vserverUrl);
+					} catch (AAIServiceException aaiexc) {
+						ctx.setAttribute(prefix + ".error.message", aaiexc.getMessage());
+						if (aaiexc.getReturnCode() >= 300) {
+							ctx.setAttribute(prefix + ".error.http.response-code", "" + aaiexc.getReturnCode());
+						}
+
+						if (aaiexc.getReturnCode() == 404)
+							return QueryStatus.NOT_FOUND;
+						else
+							return QueryStatus.FAILURE;
+					}
+					if (vserver == null) {
+						return QueryStatus.NOT_FOUND;
+					}
+					attributes = mapper.convertValue(vserver, attributes.getClass());
+					if (!attributes.containsKey("tenant-id") && tenantId != null) {
+						attributes.put("tenant-id", tenantId);
+					}
+					if (!attributes.containsKey("cloud-owner") && cloudOwner != null) {
+						attributes.put("cloud-owner", cloudOwner);
+					}
+					if (!attributes.containsKey("cloud-region-id") && cloudRegionId != null) {
+						attributes.put("cloud-region-id", cloudRegionId);
+					}
+				} else if (vserverId != null && tenantId != null) {
+					String cloudOwner = nameValues.get("cloud_region.cloud_owner");
+					String cloudRegionId = nameValues.get("cloud_region.cloud_region_id");
+
+						Vserver vserver = this.requestVServerData(tenantId, vserverId, cloudOwner, cloudRegionId);
 						if(vserver == null) {
 							return QueryStatus.NOT_FOUND;
 						}
@@ -379,6 +392,37 @@ public abstract class AAIDeclarations implements AAIClient {
 //		return QueryStatus.SUCCESS;
 	}
 
+	private boolean checkOldFormat(String resource, HashMap<String, String> nameValues) {
+
+		switch(resource){
+		case "generic-query":
+		case "named-query":
+		case "nodes-query":
+		case "linterface":
+		case "l2-bridge-sbg":
+		case "l2-bridge-bgf":
+		case "echo":
+		case "test":
+			return true;
+		}
+		if(resource.contains(":")) {
+			resource = resource.substring(0, resource.indexOf(":"));
+		}
+
+		Set<String> keys = nameValues.keySet();
+		for(String key : keys) {
+			if(!key.contains(".")) {
+				if("depth".equals(key) || "related-to".equals(key) || "related_to".equals(key))
+					continue;
+				else {
+					getLogger().warn(String.format("key %s is incompatible with resource type '%s'", key, resource));
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
 	public void writeMap(Map<String, Object> properties, String prefix, SvcLogicContext ctx) {
 		Set<String> mapKeys = properties.keySet();
 
@@ -424,13 +468,19 @@ public abstract class AAIDeclarations implements AAIClient {
 			throws SvcLogicException {
 
 		getLogger().debug("AAIService.save\tresource="+resource);
+		HashMap<String, String> nameValues = keyToHashMap(key, ctx);
 
-		if(resource == null || resource.isEmpty()) {
+		if(!checkOldFormat(resource, nameValues)) {
+			ctx.setAttribute(String.format("%s.error.message", prefix), String.format("Resource %s is not supported. Key string contains invaid identifiers", resource));
+			return QueryStatus.FAILURE;
+		}
+
+		if(resource == null || resource.isEmpty() || AAIRequest.createRequest(resource, nameValues) == null) {
 			getLogger().warn("AAIService.save has unspecified resource");
+			ctx.setAttribute(String.format("%s.error.message", prefix), String.format("Resource %s is not supported", resource));
 			return QueryStatus.FAILURE;
 		}
 		// keys passed
-		HashMap<String, String> nameValues = keyToHashMap(key, ctx);
 		getLogger().debug("key = "+ Arrays.toString(nameValues.entrySet().toArray()));
 
 		// process params
@@ -443,7 +493,6 @@ public abstract class AAIDeclarations implements AAIClient {
 		}
 		// params passed
 		getLogger().debug("parms = "+ Arrays.toString(params.entrySet().toArray()));
-
 
 		boolean useNewModelProcessing = true;
 		// process server query by name the old way
@@ -461,6 +510,7 @@ public abstract class AAIDeclarations implements AAIClient {
 					path = request.getRequestUrl("GET", null);
 					params.put("vserver-selflink", path.toString());
 				} catch (UnsupportedEncodingException | MalformedURLException e) {
+					// TODO : Fix this
 					params.put("vserver-selflink", "/vserver");
 				}
 			}
@@ -476,7 +526,7 @@ public abstract class AAIDeclarations implements AAIClient {
 					String[] tokens = resource.split(":");
 					String localResource = tokens[0];
 					String dependency = tokens[1];
-					// get the object
+
 					AAIDatum instance = newModelObjectRequest( localResource, nameValues, prefix, ctx);
 					if(instance == null) {
 						return QueryStatus.NOT_FOUND;
@@ -558,83 +608,53 @@ public abstract class AAIDeclarations implements AAIClient {
 	}
 
 	@Override
-	public QueryStatus update(String resource, String key, Map<String, String> parms, String prefix, SvcLogicContext ctx) throws SvcLogicException {
+	public QueryStatus update(String resource, String key, Map<String, String> params, String prefix, SvcLogicContext ctx) throws SvcLogicException {
 
 		resource = resource.toLowerCase();
 		HashMap<String, String> nameValues = keyToHashMap(key, ctx);
 		getLogger().debug("key = "+ Arrays.toString(nameValues.entrySet().toArray()));
-		getLogger().debug("parms = "+ Arrays.toString(parms.entrySet().toArray()));
-
-		AAIRequest request = AAIRequest.createRequest(resource, nameValues);
-		if(request == null) {
-			if("generic-vnf".equals(resource)) {
-				request = new GenericVnfRequest();
-			}
+		if(!checkOldFormat(resource, nameValues)) {
+			ctx.setAttribute(String.format("%s.error.message", prefix), String.format("Resource %s is not supported. Key string contains invaid identifiers", resource));
+			return QueryStatus.FAILURE;
 		}
 
-		String resourceType = resource;
-		if(request != null) {
-			resourceType = request.getPrimaryResourceName(resource);
+		if(resource == null || resource.isEmpty() || AAIRequest.createRequest(resource, nameValues) == null) {
+			ctx.setAttribute(String.format("%s.error.message", prefix), String.format("Resource %s is not supported", resource));
+			return QueryStatus.FAILURE;
+		}
+
+		getLogger().debug("parms = "+ Arrays.toString(params.entrySet().toArray()));
+
+		AAIRequest request = AAIRequest.createRequest(resource, nameValues);
+		request = new UpdateRequest(request, params);
+
+		String[] arguments = request.getArgsList();
+		for(String name : arguments) {
+			String modifiedKey = name.replaceAll("-", "_");
+			if(nameValues.containsKey(modifiedKey)) {
+				String argValue = nameValues.get(modifiedKey);
+				if(argValue != null) argValue = argValue.trim().replace("'", "").replace("$", "").replace("'", "");
+				request.addRequestProperty(name, argValue);
+			}
 		}
 
 		try {
-			Update update = new Update();
-			update.setUpdateNodeType(resourceType);
+			QueryStatus retval = QueryStatus.SUCCESS;
 
-			List<UpdateNodeKey> updateNodeKeyList = update.getUpdateNodeKey();
-			if(updateNodeKeyList == null) {
-				updateNodeKeyList = new ArrayList<UpdateNodeKey>();
+			retval = newModelQuery(resource, false, null, key, "tmpDelete", null,  ctx);
+
+			if(retval == null || retval != QueryStatus.SUCCESS) {
+				return retval;
 			}
 
-		    Set<String>keys = nameValues.keySet();
-
-		    for(String argument: keys) {
-		    	if(nameValues.containsKey(argument)){
-		    		String value = nameValues.get(argument);
-		    		if(value != null && !value.isEmpty()) {
-		    			argument = argument.replaceAll("_", "-");
-		    			value = value.trim().replaceAll("'", "").replace("$", "").replace("'", "");
-		    			// set node key
-		    			UpdateNodeKey updateNodeKey = new UpdateNodeKey();
-		    			if(request != null)
-		    				updateNodeKey.setKeyName( request.formatKey(argument));
-		    			else
-		    				updateNodeKey.setKeyName(argument);
-		    			updateNodeKey.setKeyValue(value);
-
-		    			updateNodeKeyList.add(updateNodeKey);
-		    		}
-		    	}
-		    }
-
-
-			// set actions
-			List<Action> actionList = update.getAction();
-			if(actionList == null) {
-				actionList = new ArrayList<Action>();
+			String resourceVersion = ctx.getAttribute("tmpDelete.resource-version");
+			if(resourceVersion == null) {
+				return QueryStatus.NOT_FOUND;
 			}
-			Action action = new Action();
-			action.setActionType("replace");
+			params.put("resource-version", resourceVersion);
 
-			List<ActionDatum> actionData = action.getActionData();
-			if(actionData == null) {
-				actionData = new ArrayList<ActionDatum>();
-			}
-
-			keys = parms.keySet();
-
-			for(String name : keys) {
-				ActionDatum actionDatum = new ActionDatum();
-				actionDatum.setPropertyName(name);
-				String value = parms.get(name);
-				actionDatum.setPropertyValue(value);
-
-				actionData.add(actionDatum);
-			}
-
-			actionList.add(action);
-
-			this.updateAnAIEntry(update);
+			request.processRequestPathValues(nameValues);
+			getExecutor().patch(request, resourceVersion);
 		} catch(AAIServiceException aaiexc) {
 			if(aaiexc.getReturnCode() == 404)
 				return QueryStatus.NOT_FOUND;
@@ -651,8 +671,19 @@ public abstract class AAIDeclarations implements AAIClient {
 
 	@Override
 	public QueryStatus delete(String resource, String key, SvcLogicContext ctx) throws SvcLogicException {
+		getLogger().debug("AAIService.delete\tresource="+resource);
 		HashMap<String, String> nameValues = keyToHashMap(key, ctx);
 		getLogger().debug("key = "+ Arrays.toString(nameValues.entrySet().toArray()));
+
+		if(!checkOldFormat(resource, nameValues)) {
+			ctx.setAttribute(String.format("%s.error.message", "aaiData"), String.format("Resource %s is not supported. Key string contains invaid identifiers", resource));
+			return QueryStatus.FAILURE;
+		}
+
+		if(resource == null || resource.isEmpty() || AAIRequest.createRequest(resource, nameValues) == null) {
+			ctx.setAttribute(String.format("%s.error.message", "tmpDelete"), String.format("Resource %s is not supported", resource));
+			return QueryStatus.FAILURE;
+		}
 
 		if(AAIRequest.createRequest(resource, nameValues) != null) {
 			if(resource.contains(":")) {
@@ -745,6 +776,16 @@ public abstract class AAIDeclarations implements AAIClient {
 					if(!itemRemoved)
 						return QueryStatus.NOT_FOUND;
 
+//					AAIRequest masterRequest = new GenericVnfRequest();
+//					masterRequest.addRequestProperty(GenericVnfRequest.VNF_ID, vnfId);
+//					relationshipRequest.addMasterRequest(masterRequest);
+//					Map<String, String> attributes = objectToProperties(vnf);
+//					try {
+//						Boolean result = getExecutor().delete(relationshipRequest, attributes.get(AAIRequest.RESOURCE_VERSION));
+//					} catch (AAIServiceException e) {
+//						return QueryStatus.FAILURE;
+//					}
+
 					try {
 						this.postGenericVnfData(vnf.getVnfId(), vnf);
 					} catch (AAIServiceException exc) {
@@ -799,6 +840,7 @@ public abstract class AAIDeclarations implements AAIClient {
 			}
 
 			Map<String, String> params = new HashMap<String, String>();
+
 			request.processRequestPathValues(nameValues);
 			if(nameValues.containsKey("prefix")){
 				Map<String, String> tmpParams = ctxGetBeginsWith(ctx, nameValues.get("prefix"));
@@ -845,12 +887,6 @@ public abstract class AAIDeclarations implements AAIClient {
 				if(iRIlist == null || iRIlist.isEmpty()) {
 					return QueryStatus.NOT_FOUND;
 				}
-
-				ObjectMapper mapper = getObjectMapper();
-			    Map<String, Object> subnetsList = mapper.convertValue(rd, Map.class);
-			    writeMap(subnetsList,  prefix, ctx);
-				return QueryStatus.SUCCESS;
-//				writeList((ArrayList)iRIlist, String.format("%s.%s", prefix, "inventory-response-items"), ctx);
 			}
 
 			if("nodes-query".equals(resource)) {
@@ -899,9 +935,10 @@ public abstract class AAIDeclarations implements AAIClient {
 		    	}
 
 		    	if(value instanceof ArrayList) {
-		    		ArrayList array = ArrayList.class.cast(value);
+		    		ArrayList<?> array = ArrayList.class.cast(value);
 		    		for(int i = 0; i < array.size(); i++) {
-		    			ctx.setAttribute(String.format("%s%s[%d]", preFix, theKey, i), array.get(i).toString());
+//		    			ctx.setAttribute(String.format("%s%s[%d]", preFix, theKey, i), array.get(i).toString());
+		    			writeList(array, String.format("%s.%s", prefix, theKey), ctx);
 		    		}
 		    		continue;
 		    	}
@@ -1026,15 +1063,8 @@ public abstract class AAIDeclarations implements AAIClient {
 			if(request == null) {
 				return null;
 			}
-			String[] arguments = request.getArgsList();
-			for(String name : arguments) {
-				String tmpName = name.replaceAll("-", "_");
-				String value = params.get(tmpName);
-				if(value != null && !value.isEmpty()) {
-					value = value.trim().replace("'", "").replace("$", "").replace("'", "");
-					request.addRequestProperty(name, value);
-				}
-			}
+
+			request.processRequestPathValues(params);
 			String rv = getExecutor().get(request);
 			response = request.jsonStringToObject(rv);
 		} catch(AAIServiceException aaiexc) {
@@ -1095,7 +1125,7 @@ public abstract class AAIDeclarations implements AAIClient {
 							Method setter = null;
 							try {
 								setter = resourceClass.getMethod("set"+StringUtils.capitalize(value), type);
-								if(type.getName().startsWith("java.lang")) {
+								if(type.getName().startsWith("java.lang") || "boolean".equals(type.getName()) || "long".equals(type.getName())) {
 									try {
 										setter.setAccessible(true);
 										Object arglist[] = new Object[1];
@@ -1104,7 +1134,13 @@ public abstract class AAIDeclarations implements AAIClient {
 										if(arglist[0] != null) {
 											if(!type.getName().equals("java.lang.String")) {
 //											getLogger().debug(String.format("Processing %s with parameter %s", types[0].getName(), value));
-												arglist[0] = valueOf(type, parms.get(id));
+												if("boolean".equals(type.getName())) {
+													arglist[0] = valueOf(Boolean.class, parms.get(id));
+												} else if("long".equals(type.getName())) {
+														arglist[0] = valueOf(Long.class, parms.get(id));
+												} else {
+													arglist[0] = valueOf(type, parms.get(id));
+												}
 											}
 											Object o = setter.invoke(instance, arglist);
 										}
@@ -1377,9 +1413,6 @@ public abstract class AAIDeclarations implements AAIClient {
 
 
 			// 6. Prepare AAI request
-//			HashMap<String, String> nameValues = keyToHashMap(key, ctx);
-			Set<String> keys = nameValues.keySet();
-			for(String haslo : keys) { getLogger().debug("Key = " + haslo + "\tValue = ->" + nameValues.get(haslo) + "<-"); }
 			String[] args = request.getArgsList();
 			for(String arg : args) {
 				String modifiedKey = arg.replaceAll("-", "_");
@@ -1389,6 +1422,8 @@ public abstract class AAIDeclarations implements AAIClient {
 					request.addRequestProperty(arg, argValue);
 				}
 			}
+
+			request.processRequestPathValues(nameValues);
 			request.setRequestObject(instance);
 			getExecutor().post(request);
 
@@ -1488,33 +1523,34 @@ public abstract class AAIDeclarations implements AAIClient {
 
 				j = 0;
 				String relatedTo = params.get(searchKey);
+				String relatedLinkKey = "relationship-list.relationship[" + i + "].related-link";
+				String relatedLink = null;
+				if(params.containsKey(relatedLinkKey)) {
+					relatedLink = params.get(relatedLinkKey);
+				}
 
-				Relationship relationship = null; //findRelationship(relationships, relatedTo);
-				if(relationship == null) {
-					relationship = new Relationship();
+				Relationship relationship = new Relationship();
 					relationships.add(relationship);
 					relationship.setRelatedTo(relatedTo);
+					if(relatedLink != null) {
+						relationship.setRelatedLink(relatedLink);
+				} else  {
+					List<RelationshipData> relData = relationship.getRelationshipData();
+
+					while(true) {
+						String searchRelationshipKey = "relationship-list.relationship[" + i + "].relationship-data[" + j + "].relationship-key";
+						String searchRelationshipValue = "relationship-list.relationship[" + i + "].relationship-data[" + j + "].relationship-value";
+						if(!params.containsKey(searchRelationshipKey))
+							break;
+
+						RelationshipData relDatum = new RelationshipData();
+						relDatum.setRelationshipKey(params.get(searchRelationshipKey));
+						relDatum.setRelationshipValue(params.get(searchRelationshipValue));
+						relData.add(relDatum);
+						j++;
+					}
 				}
 
-
-				List<RelationshipData> relData = relationship.getRelationshipData();
-//				if(relData == null) {
-//					relData = new LinkedList<RelationshipDatum>();
-//					relationship.setRelationshipData(relData);
-//				}
-
-				while(true) {
-					String searchRelationshipKey = "relationship-list.relationship[" + i + "].relationship-data[" + j + "].relationship-key";
-					String searchRelationshipValue = "relationship-list.relationship[" + i + "].relationship-data[" + j + "].relationship-value";
-					if(!params.containsKey(searchRelationshipKey))
-						break;
-
-					RelationshipData relDatum = new RelationshipData();
-					relDatum.setRelationshipKey(params.get(searchRelationshipKey));
-					relDatum.setRelationshipValue(params.get(searchRelationshipValue));
-					relData.add(relDatum);
-					j++;
-				}
 
 				i++;
 			}
@@ -1688,8 +1724,8 @@ public abstract class AAIDeclarations implements AAIClient {
 		return QueryStatus.NOT_FOUND;
 	}
 
-	private Map<String, Object> objectToProperties(Object object) {
-		ObjectMapper mapper = getObjectMapper();
+	protected Map<String, Object> objectToProperties(Object object) {
+		ObjectMapper mapper = AAIService.getObjectMapper();
 		return mapper.convertValue(object, Map.class);
 	}
 
@@ -1697,12 +1733,10 @@ public abstract class AAIDeclarations implements AAIClient {
 	    Exception cause = null;
 	    T ret = null;
 	    try {
-	        ret = klazz.cast(
-	            klazz.getDeclaredMethod("valueOf", String.class)
-	            .invoke(null, arg)
-	        );
-	    } catch (NoSuchMethodException e) {
-	        cause = e;
+	        ret = klazz.cast(klazz.getDeclaredMethod("valueOf", String.class).invoke(null, arg));
+	    } catch (NoSuchMethodException exc) {
+	    	LoggerFactory.getLogger(AAIService.class).warn("Wrong data type", exc);
+	    	ret = klazz.cast(arg);
 	    } catch (IllegalAccessException e) {
 	        cause = e;
 	    } catch (InvocationTargetException e) {
@@ -1727,6 +1761,8 @@ public abstract class AAIDeclarations implements AAIClient {
 
 			Class resourceClass = request.getModelClass();
 			Object instance = getResource(url.toString(), resourceClass);
+			if(instance == null)
+				return QueryStatus.NOT_FOUND;
 
 			// get resource version
 			String resourceVersion = null;
@@ -1770,14 +1806,19 @@ public abstract class AAIDeclarations implements AAIClient {
 
 			relatedTo = relatedTo.replaceAll("_", "-");
 
+			String relatedLink = nameValues.get("relationship.related_link");
+
 			List<Relationship> relationships = relationshipList.getRelationship();
 			List<Relationship> relationshipsToDelete = new LinkedList<Relationship>();
 
 			for(Relationship relationship : relationships) {
-				getLogger().debug(String.format("Comparing existing relationship of '%s' to keyword '%s'", relationship.getRelatedTo(),  relatedTo));
 				if(relatedTo.equals(relationship.getRelatedTo())) {
-					getLogger().debug("Found relationship");
-//					targetRelationship = relationship;
+					if(relatedLink != null) {
+						if(relationship.getRelatedLink() == null || !relationship.getRelatedLink().endsWith(relatedLink)) {
+							continue;
+						}
+					}
+					getLogger().debug(String.format("Found relationship of '%s' to keyword '%s'", relationship.getRelatedTo(),  relatedTo));
 					relationshipsToDelete.add(relationship);
 				}
 			}
@@ -1790,7 +1831,7 @@ public abstract class AAIDeclarations implements AAIClient {
 			path = path + "/relationship-list/relationship";
 			URL deleteUrl = new URL(path);
 
-			ObjectMapper mapper = getObjectMapper();
+			ObjectMapper mapper = AAIService.getObjectMapper();
 
 			boolean cumulativeResponse = true;
 
@@ -1813,7 +1854,7 @@ public abstract class AAIDeclarations implements AAIClient {
 		}
 	}
 
-	public static final Map<String, String> ctxGetBeginsWith( SvcLogicContext ctx, String prefix ) {
+	static final Map<String, String> ctxGetBeginsWith( SvcLogicContext ctx, String prefix ) {
 		Map<String, String> tmpPrefixMap = new HashMap<String, String>();
 
 		if(prefix == null || prefix.isEmpty()){
@@ -1862,7 +1903,7 @@ public abstract class AAIDeclarations implements AAIClient {
 
 	/**
 	*/
-	private NamedQueryData extractNamedQueryDataFromQueryPrefix(HashMap<String, String> nameValues, Map<String, String> parms) {
+	protected NamedQueryData extractNamedQueryDataFromQueryPrefix(HashMap<String, String> nameValues, Map<String, String> parms) {
 		if(parms.isEmpty()) {
 			return null;
 		}
@@ -1932,6 +1973,24 @@ public abstract class AAIDeclarations implements AAIClient {
 							InstanceFilter insf = new InstanceFilter();
 							insf.setPnf(pnf);
 							data.getInstanceFilters().getInstanceFilter().add(insf);
+
+//						} else if("service-instance".equals(split[0])) {
+//							ServiceInstance serviceInstance = new ServiceInstance();
+//							serviceInstance.setServiceInstanceId(value);
+//
+//							InstanceFilter insf = new InstanceFilter();
+//							insf.setServiceInstance(serviceInstance);
+//							data.getInstanceFilters().getInstanceFilter().add(insf);
+
+//						} else if("l3-network".equals(split[0])) {
+//							L3Network l3Network = new L3Network();
+//							if("network-role".equals(split[1])) {
+//								l3Network.setNetworkRole(value);
+//							}
+//
+//							InstanceFilter insf = new InstanceFilter();
+//							insf.setL3Network(l3Network);
+//							data.getInstanceFilters().getInstanceFilter().add(insf);
 						}
 					}
 				}

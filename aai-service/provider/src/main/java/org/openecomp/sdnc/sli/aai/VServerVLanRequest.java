@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openecomp.aai.inventory.v8.Vlan;
 
 public class VServerVLanRequest extends AAIRequest {
-	//aai/v7/cloud-infrastructure/tenants/tenant/{tenant-id}/vservers/vserver/{vserver-id}/l-interfaces/l-interface/{interface-name}/vlans/vlan/{vlan-interface}
 
 	// tenant (1602)
 	public static final String VLAN_PATH		= "org.openecomp.sdnc.sli.aai.path.vlan";

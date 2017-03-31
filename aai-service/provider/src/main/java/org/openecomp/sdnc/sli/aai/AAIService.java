@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,24 +25,35 @@ package org.openecomp.sdnc.sli.aai;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -50,26 +61,21 @@ import java.util.regex.Pattern;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocketFactory;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.UriBuilder;
+import javax.xml.bind.annotation.XmlElement;
 
 import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.lang3.StringUtils;
-import org.openecomp.aai.inventory.v8.AvailabilityZone;
-import org.openecomp.aai.inventory.v8.GenericVnf;
-import org.openecomp.aai.inventory.v8.L3Network;
-import org.openecomp.aai.inventory.v8.PInterface;
-import org.openecomp.aai.inventory.v8.PhysicalLink;
-import org.openecomp.aai.inventory.v8.Pserver;
-import org.openecomp.aai.inventory.v8.ResultData;
-import org.openecomp.aai.inventory.v8.SearchResults;
-import org.openecomp.aai.inventory.v8.Service;
-import org.openecomp.aai.inventory.v8.ServiceInstance;
-import org.openecomp.aai.inventory.v8.Tenant;
-import org.openecomp.aai.inventory.v8.Vserver;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.openecomp.sdnc.sli.ConfigurationException;
-import org.openecomp.sdnc.sli.MetricLogger;
+
 import org.openecomp.sdnc.sli.SvcLogicContext;
 import org.openecomp.sdnc.sli.SvcLogicException;
 import org.openecomp.sdnc.sli.SvcLogicResource;
@@ -80,59 +86,40 @@ import org.openecomp.sdnc.sli.aai.data.ResourceVersion;
 import org.openecomp.sdnc.sli.aai.data.ServiceException;
 import org.openecomp.sdnc.sli.aai.data.notify.NotifyEvent;
 import org.openecomp.sdnc.sli.aai.data.v1507.VServer;
-import org.openecomp.sdnc.sli.aai.update.Update;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.AnnotationIntrospector;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationIntrospector;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
+import com.sun.jersey.client.urlconnection.HTTPSProperties;
+
+import org.openecomp.aai.inventory.v8.*;
 
 
 public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicResource {
 
 	public static final String AAICLIENT_PROPERTIES = "/aaiclient.properties";
+	public static final String PATH_PROPERTIES = "/aai-path.properties";
 
 	private static final Logger LOG = LoggerFactory.getLogger(AAIService.class);
 
 	private final String truststore_path;
 	private final String truststore_password;
-//	private final String keystore_path;
-//	private final String keystore_password;
+	private final String keystore_path;
+	private final String keystore_password;
 	private final Boolean ignore_certificate_host_error;
 
 	private final String target_uri;
-	private final String query_path;
-	private final String network_vce_path;
-
-	private final String network_vpe_path;
-
-	private final String network_vpls_pe_path;
-
-	private final String network_complex_path;
-
-	private final String network_pserver_path;
+	private final String query_path;       //  = "sdn-zone-query";
 
 	private final String network_vserver_path;
-
-	private final String ctag_pool_path;
 
 	private final String svc_instance_path;
 	private final String svc_inst_qry_path;
 
-	private final String generic_vnf_path;
-
-	private final String network_dvsswitch_path;
-
-	private final String l3_network_path;
-	private final String l3_network_path_query_name;
-
-	private final String vpn_binding_path;
-
-	private final String vnf_image_path;
 	private final String vnf_image_query_path;
 
 	private final String param_format;  				//= "filter=%s:%s";
@@ -145,8 +132,6 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	private final String selflink_fqdn;
 
 	private final String p_interface_path;
-	private final String physical_link_path;
-	private final String customer_path;
 
 	private final String service_path;
 	private final String site_pair_set_path;
@@ -164,12 +149,25 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	private String user_name;
 	private String user_password;
 
-	private final MetricLogger ml = new MetricLogger();
+	// runtime
+	private final boolean runtimeOSGI;
+
+	private SSLContext CTX;
+
+//	private final MetricLogger ml = new MetricLogger();
 
 	private final AAIRequestExecutor executor;
 
 	public AAIService(URL propURL) {
 		LOG.info("Entered AAIService.ctor");
+
+		String runtime = System.getProperty("aaiclient.runtime");
+		if(runtime != null && runtime.equals("OSGI")) {
+			runtimeOSGI = true;
+		} else {
+			runtimeOSGI = false;
+		}
+
 		Properties props = null;
 		try {
 			props = initialize(propURL);
@@ -193,6 +191,8 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 		truststore_path 	= props.getProperty(TRUSTSTORE_PATH);
 		truststore_password = props.getProperty(TRUSTSTORE_PSSWD);
+		keystore_path 		= props.getProperty(KEYSTORE_PATH);
+		keystore_password 	= props.getProperty(KEYSTORE_PSSWD);
 
 		target_uri 			= props.getProperty(TARGET_URI);
 		query_path 			= props.getProperty(QUERY_PATH);
@@ -222,20 +222,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		connection_timeout = tmpConnectionTimeout;
 		read_timeout = tmpReadTimeout;
 
-		network_vce_path	= props.getProperty(NETWORK_VCE_PATH);
-
-		network_vpe_path	= props.getProperty(NETWORK_VPE_PATH);
-
-		network_vpls_pe_path =props.getProperty(NETWORK_VPLS_PE_PATH);
-
-		network_complex_path  =props.getProperty(NETWORK_COMPLEX_PATH);
-
-		network_pserver_path =props.getProperty(NETWORK_PSERVER_PATH);
-
 		network_vserver_path =props.getProperty(NETWORK_VSERVER_PATH);
-
-		ctag_pool_path =props.getProperty(CTAG_POOL_PATH);
-
 
 		svc_instance_path	= props.getProperty(SVC_INSTANCE_PATH); // "/aai/v1/business/customers/customer/{customer-id}/service-subscriptions/service-subscription/{service-type}/service-instances");
 //		"/aai/v1/business/customers/customer/ma9181-203-customerid/service-subscriptions/service-subscription/ma9181%20Hosted%20Voice/service-instances";
@@ -252,26 +239,11 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		// P-Interfaces
 		p_interface_path   = props.getProperty(P_INTERFACE_PATH);
 
-		// Physical Link
-		physical_link_path = props.getProperty(PHYSICAL_LINK_PATH);
-
-		generic_vnf_path	= props.getProperty(GENERIC_VNF_PATH);
-
-		network_dvsswitch_path	= props.getProperty(NETWORK_DVSSWITCH_PATH);
-
-		l3_network_path		= props.getProperty(L3_NETWORK_PATH);
-		l3_network_path_query_name	= props.getProperty(L3_NETWORK_PATH_QUERY_NAME);
-
-		vpn_binding_path	= props.getProperty(VPN_BINDING_PATH);
-
-		vnf_image_path	= props.getProperty(VNF_IMAGE_PATH);
 		vnf_image_query_path	= props.getProperty(VNF_IMAGE_QUERY_PATH);
 
 		ubb_notify_path = props.getProperty(UBB_NOTIFY_PATH);
 		selflink_avpn = props.getProperty(SELFLINK_AVPN);
 		selflink_fqdn = props.getProperty(SELFLINK_FQDN);
-
-		customer_path = props.getProperty(CUSTOMER_PATH);
 
 		service_path  = props.getProperty(SERVICE_PATH);
 
@@ -287,18 +259,92 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 		ignore_certificate_host_error = host_error;
 
-		HttpsURLConnection.setDefaultHostnameVerifier( new HostnameVerifier(){
-			public boolean verify(String string,SSLSession ssls) {
-				return ignore_certificate_host_error;
-			}
-		});
+        HttpsURLConnection.setDefaultHostnameVerifier( new HostnameVerifier(){
+            public boolean verify(String string,SSLSession ssls) {
+                return ignore_certificate_host_error;
+            }
+        });
 
 		if(truststore_path != null && truststore_password != null && (new File(truststore_path)).exists()) {
 			System.setProperty("javax.net.ssl.trustStore", truststore_path);
 			System.setProperty("javax.net.ssl.trustStorePassword", truststore_password);
 		}
 
+        if(keystore_path != null && keystore_password != null && (new File(keystore_path)).exists())
+        {
+    	DefaultClientConfig config = new DefaultClientConfig();
+        //both jersey and HttpURLConnection can use this
+        SSLContext ctx = null;
+        try {
+            ctx = SSLContext.getInstance("TLS");
+
+            KeyManagerFactory kmf = null;
+            try {
+            	String def = "SunX509";
+            	String storeType = "PKCS12";
+            	def = KeyStore.getDefaultType();
+                kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                FileInputStream fin = new FileInputStream(keystore_path);
+//                KeyStore ks = KeyStore.getInstance("PKCS12");
+
+                String extension = keystore_path.substring(keystore_path.lastIndexOf(".") + 1);
+
+                if(extension != null && !extension.isEmpty() && extension.equalsIgnoreCase("JKS")) {
+                	storeType = "JKS";
+                }
+                KeyStore ks = KeyStore.getInstance(storeType);
+
+                char[] pwd = keystore_password.toCharArray();
+                ks.load(fin, pwd);
+                kmf.init(ks, pwd);
+            } catch (Exception ex) {
+            	LOG.error("AAIResource", ex);
+            }
+
+            ctx.init(kmf.getKeyManagers(), null, null);
+            config.getProperties().put(HTTPSProperties.PROPERTY_HTTPS_PROPERTIES, new HTTPSProperties( new HostnameVerifier() {
+                    @Override
+                    public boolean verify( String s, SSLSession sslSession ) {
+                        return ignore_certificate_host_error;
+                    }
+            }, ctx));
+
+            CTX = ctx;
+        		LOG.debug("SSLContext created");
+
+        } catch (KeyManagementException | NoSuchAlgorithmException exc) {
+        	LOG.error("AAIResource", exc);
+		}
+        }
+
         LOG.info("AAIResource.ctor initialized.");
+
+        try {
+            Field methodsField = HttpURLConnection.class.getDeclaredField("methods");
+            methodsField.setAccessible(true);
+            // get the methods field modifiers
+            Field modifiersField = Field.class.getDeclaredField("modifiers");
+            // bypass the "private" modifier
+            modifiersField.setAccessible(true);
+
+            // remove the "final" modifier
+            modifiersField.setInt(methodsField, methodsField.getModifiers() & ~Modifier.FINAL);
+
+            /* valid HTTP methods */
+            String[] methods = {
+                       "GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE", "PATCH"
+            };
+            // set the new methods - including patch
+            methodsField.set(null, methods);
+
+        } catch (SecurityException | IllegalArgumentException | IllegalAccessException | NoSuchFieldException e) {
+         e.printStackTrace();
+        }
+
+	}
+
+	public void cleanUp() {
+
 	}
 
 	/**
@@ -320,26 +366,30 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
         con.setReadTimeout( read_timeout );
         con.setRequestMethod( method );
         con.setRequestProperty( "Accept", "application/json" );
-        con.setRequestProperty( "Content-Type", "application/json" );
+    	con.setRequestProperty( "Content-Type",  "PATCH".equalsIgnoreCase(method) ? "application/merge-patch+json" : "application/json" );
         con.setRequestProperty("X-FromAppId", application_id);
         con.setRequestProperty("X-TransactionId",TransactionIdTracker.getNextTransactionId());
+//        con.setRequestProperty(MetricLogger.REQUEST_ID, ml.getRequestID());
 
-	        if(user_name != null && !user_name.isEmpty() && user_password != null && !user_password.isEmpty()) {
-	        	String basicAuth = "Basic " + new String(Base64.encodeBase64((user_name + ":" + user_password).getBytes()));
-	        	con.setRequestProperty ("Authorization", basicAuth);
-	        }
+        if(user_name != null && !user_name.isEmpty() && user_password != null && !user_password.isEmpty()) {
+        	String basicAuth = "Basic " + new String(Base64.encodeBase64((user_name + ":" + user_password).getBytes()));
+        	con.setRequestProperty ("Authorization", basicAuth);
+        }
 
+        if(con instanceof HttpsURLConnection && CTX != null) {
+        	SSLSocketFactory sockFact = CTX.getSocketFactory();
+        	HttpsURLConnection.class.cast(con).setSSLSocketFactory( sockFact );
+        }
         return con;
 	}
-
 
 	@Override
 	public GenericVnf requestGenericVnfData(String vnf_id) throws AAIServiceException {
 		GenericVnf response = null;
 
 		try {
-			AAIRequest request = new GenericVnfRequest();
-			request.addRequestProperty(GenericVnfRequest.GENERIC_VNF_ID, vnf_id);
+			AAIRequest request = AAIRequest.getRequestFromResource("generic-vnf");
+			request.addRequestProperty("generic-vnf.vnf-id", vnf_id);
 			String rv = executor.get(request);
 			if(rv != null) {
 				ObjectMapper mapper = getObjectMapper();
@@ -361,8 +411,8 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		boolean response = false;
 
 		try {
-			AAIRequest request = new GenericVnfRequest();
-			request.addRequestProperty(GenericVnfRequest.GENERIC_VNF_ID, vnf_id);
+			AAIRequest request = AAIRequest.getRequestFromResource("generic-vnf");
+			request.addRequestProperty("generic-vnf.vnf-id", vnf_id);
 			request.setRequestObject(data);
 			response = executor.post(request);
 		} catch(AAIServiceException aaiexc) {
@@ -377,75 +427,19 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	@Override
 	public boolean deleteGenericVnfData(String vnf_id, String resourceVersion) throws AAIServiceException {
 		boolean response = false;
-		InputStream inputStream = null;
 
 		try {
-
-			String request_url = target_uri+generic_vnf_path;
-
-			String encoded_vnf = encodeQuery(vnf_id);
-			request_url = request_url.replace("{vnf-id}", encoded_vnf) ;
-			if(resourceVersion!=null) {
-				request_url = request_url +"?resource-version="+resourceVersion;
-			}
-			URL http_req_url =	new URL(request_url);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.DELETE);
-
-            LOGwriteFirstTrace(HttpMethod.DELETE, http_req_url.toString());
-            LOGwriteDateTrace("vnf_id", vnf_id);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-            String line = null;
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", stringBuilder.toString());
-				response = true;
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-				LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-				response = false;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
+			AAIRequest request = AAIRequest.getRequestFromResource("generic-vnf");
+			request.addRequestProperty("generic-vnf.vnf-id", vnf_id);
+			response = executor.delete(request, resourceVersion);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("deleteGenericVnfData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
 		return response;
 	}
-
-
 
 	@Override
 	public SearchResults requestServiceInstanceURL(String svc_instance_id) throws AAIServiceException {
@@ -477,11 +471,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
             if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
             BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
 
-            ObjectMapper mapper = new ObjectMapper();
-		    AnnotationIntrospector introspector = new JaxbAnnotationIntrospector(TypeFactory.defaultInstance());
-		 // if ONLY using JAXB annotations:
-		    mapper.setAnnotationIntrospector(introspector);
-            mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+            ObjectMapper mapper = getObjectMapper();
 
 			if (responseCode == HttpURLConnection.HTTP_OK) {
 //				StringBuilder stringBuilder = new StringBuilder("\n");
@@ -592,153 +582,45 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	@Override
 	public ServiceInstance requestServiceInterfaceData(String customer_id, String service_type, String svc_instance_id) throws AAIServiceException {
 		ServiceInstance response = null;
-		InputStream inputStream = null;
 
 		try {
-			String path = svc_instance_path;
-			path = path.replace("{customer-id}",  encodeQuery(customer_id));
-			path = path.replace("{service-type}", encodeQuery(service_type));
-			String request_url = target_uri+path;
-			if(!request_url.endsWith("/")) {
-				request_url = request_url + "/service-instance/";
-			} else {
-				request_url = request_url + "service-instance/";
+			AAIRequest request = AAIRequest.getRequestFromResource("service-instance");
+			request.addRequestProperty("customer.global-customer-id", customer_id);
+			request.addRequestProperty("ervice-subscription.service-type", service_type);
+			request.addRequestProperty("service-instance.service-instance-id", svc_instance_id);
+
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, ServiceInstance.class);
 			}
-			request_url = request_url + encodeQuery(svc_instance_id);
-			URL http_req_url =	new URL(request_url);
-
-			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
-
-            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
-            LOGwriteDateTrace("customer_id", customer_id);
-            LOGwriteDateTrace("service_type", service_type);
-            LOGwriteDateTrace("svc_instance_id", svc_instance_id);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK) {
-//				StringBuilder stringBuilder = new StringBuilder("\n");
-//				String line = null;
-//				while( ( line = reader.readLine() ) != null ) {
-//					stringBuilder.append("\n").append( line );
-//				}
-//				LOG.info(stringBuilder.toString());
-            	response = mapper.readValue(reader, ServiceInstance.class);
-            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-            	return response;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("requestServiceInterfaceData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
 		return response;
 	}
 
 	@Override
-	public boolean postServiceInterfaceData(String customer_id, String service_type, String svc_instance_id, ServiceInstance request) throws AAIServiceException {
-
-		InputStream inputStream = null;
+	public boolean postServiceInterfaceData(String customer_id, String service_type, String svc_instance_id, ServiceInstance data) throws AAIServiceException {
+		boolean response = false;
 
 		try {
-			ObjectMapper mapper = getObjectMapper();
-			String json_text = mapper.writeValueAsString(request);
-
-			String path = svc_instance_path;
-			path = path.replace("{customer-id}",  encodeQuery(customer_id));
-			path = path.replace("{service-type}", encodeQuery(service_type));
-			String request_url = target_uri+path;
-			if(!request_url.endsWith("/")) {
-				request_url = request_url + "/service-instance/";
-			} else {
-				request_url = request_url + "service-instance/";
-			}
-			request_url = request_url + encodeQuery(svc_instance_id);
-			URL http_req_url =	new URL(request_url);
-
-			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.PUT);
-
-            OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
-            osw.write(json_text);
-            osw.flush();
-            osw.close();
-
-
-            LOGwriteFirstTrace("PUT", request_url);
-            LOGwriteDateTrace("customer_id", customer_id);
-            LOGwriteDateTrace("service_type", service_type);
-            LOGwriteDateTrace("svc_instance_id", svc_instance_id);
-            LOGwriteDateTrace("RelationshipList", json_text);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            BufferedReader reader;
-            String line = null;
-            reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
-				return true;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
+			AAIRequest request = AAIRequest.getRequestFromResource("service-instance");
+			request.addRequestProperty("customer.customer-id", customer_id);
+			request.addRequestProperty("service-subscription.service-type", service_type);
+			request.addRequestProperty("service-instance.service-instance-id", svc_instance_id);
+			request.setRequestObject(data);
+			response = executor.post(request);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
-			LOG.warn("postServiceInterfaceData", exc);
+			LOG.warn("requestGenericVnfData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			try {
-				if(inputStream != null)
-				inputStream.close();
-			} catch (Exception exc) {
-
-			}
 		}
+		return response;
 	}
 
 	/*
@@ -855,18 +737,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	/*
 	 * (non-Javadoc)
-	 * @see org.openecomp.sdnc.sli.aai.AAIClient#requestVServersData(java.lang.String, java.lang.String)
+	 * @see org.openecomp.sdnct.sli.aai.AAIClient#requestVServersData(java.lang.String, java.lang.String)
 	 */
 	@Override
-	public Vserver requestVServerData(String tenant_id, String vserver_id, String cloudOwner, String cloudRegionId)	throws AAIServiceException {
+	public Vserver requestVServerData(String tenantId, String vserverId, String cloudOwner, String cloudRegionId)	throws AAIServiceException {
 		Vserver response = null;
 
 		try {
-			AAIRequest request = new VserverRequest();
-			request.addRequestProperty(TenantRequest.TENANT_TENANT_ID, tenant_id);
-			request.addRequestProperty(VserverRequest.VSERVER_VSERVER_ID, vserver_id);
-			request.addRequestProperty(CloudRegionRequest.CLOUD_REGION_CLOUD_OWNER, cloudOwner);
-			request.addRequestProperty(CloudRegionRequest.CLOUD_REGION_CLOUD_REGION_ID, cloudRegionId);
+			AAIRequest request = AAIRequest.getRequestFromResource("vserver");
+			request.addRequestProperty("cloud-region.cloud-owner", cloudOwner);
+			request.addRequestProperty("cloud-region.cloud-region-id", cloudRegionId);
+			request.addRequestProperty("tenant.tenant-id", tenantId);
+			request.addRequestProperty("vserver.vserver-id", vserverId);
 
 			String rv = executor.get(request);
 			if(rv != null) {
@@ -884,80 +766,24 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 
 	@Override
-	public boolean postVServerData(String tenantId, String vserverId, String cloudOwner, String cloudRegionId, Vserver request) throws AAIServiceException {
-		InputStream inputStream = null;
+	public boolean postVServerData(String tenantId, String vserverId, String cloudOwner, String cloudRegionId, Vserver data) throws AAIServiceException {
+		boolean response = false;
 
 		try {
-
-			ObjectMapper mapper = getObjectMapper();
-			String json_text = mapper.writeValueAsString(request);
-
-			String local_network_complexes_path = network_vserver_path.replace("{tenant-id}", encodeQuery(tenantId));
-			local_network_complexes_path = local_network_complexes_path.replace("{vserver-id}", encodeQuery(vserverId));
-
-			local_network_complexes_path = local_network_complexes_path.replace("{cloud-owner}", encodeQuery(cloudOwner));
-			local_network_complexes_path = local_network_complexes_path.replace("{cloud-region-id}", encodeQuery(cloudRegionId));
-
-			String request_url = target_uri+local_network_complexes_path;
-
-			URL http_req_url =	new URL(request_url);
-
-			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.PUT);
-
-            OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
-            osw.write(json_text);
-            osw.flush();
-            osw.close();
-
-
-            LOGwriteFirstTrace("PUT", request_url);
-            LOGwriteDateTrace("tenant-id", tenantId);
-            LOGwriteDateTrace("vserver-id", vserverId);
-            LOGwriteDateTrace("cloud-owner", cloudOwner);
-            LOGwriteDateTrace("cloud-region-id", cloudRegionId);
-
-            LOGwriteDateTrace("Vserver", json_text);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            BufferedReader reader;
-            String line = null;
-            reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
-				return true;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
+			AAIRequest request = AAIRequest.getRequestFromResource("vserver");
+			request.addRequestProperty("cloud-region.cloud-owner", cloudOwner);
+			request.addRequestProperty("cloud-region.cloud-region-id", cloudRegionId);
+			request.addRequestProperty("tenant.tenant-id", tenantId);
+			request.addRequestProperty("vserver.vserver-id", vserverId);
+			request.setRequestObject(data);
+			response = executor.post(request);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
-			LOG.warn("postVServerData", exc);
+			LOG.warn("postNetworkComplexData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			try {
-				if(inputStream != null)
-				inputStream.close();
-			} catch (Exception exc) {
-
-			}
 		}
+		return response;
 	}
 
 	@Override
@@ -1041,203 +867,55 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	@Override
 	public PhysicalLink  requestPhysicalLinkData(String linkName) throws AAIServiceException {
 		PhysicalLink response = null;
-		InputStream inputStream = null;
 
 		try {
-			String request_url = target_uri+physical_link_path;
+			AAIRequest request = AAIRequest.getRequestFromResource("physical-link");
+			request.addRequestProperty("physical-link.link-name", linkName);
 
-			String encoded_vnf = encodeQuery(linkName);
-			request_url = request_url.replace("{link-name}", encoded_vnf) ;
-			URL http_req_url =	new URL(request_url);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
-
-            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
-            LOGwriteDateTrace("link-name", linkName);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK) {
-//				StringBuilder stringBuilder = new StringBuilder("\n");
-//				String line = null;
-//				while( ( line = reader.readLine() ) != null ) {
-//					stringBuilder.append("\n").append( line );
-//				}
-//				LOG.info(stringBuilder.toString());
-            	response = mapper.readValue(reader, PhysicalLink.class);
-            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
-            } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-            	return response;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, PhysicalLink.class);
+			}
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("requestPhysicalLinkData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
 		return response;
 	}
 
 	@Override
-	public boolean postPhysicalLinkData(String linkName, PhysicalLink request) throws AAIServiceException {
-		InputStream inputStream = null;
-
+	public boolean postPhysicalLinkData(String linkName, PhysicalLink data) throws AAIServiceException {
+		boolean response = false;
 		try {
-
-			ObjectMapper mapper = getObjectMapper();
-			String json_text = mapper.writeValueAsString(request);
-
-			String request_url = target_uri+physical_link_path;
-			String encoded_vnf = encodeQuery(linkName);
-			request_url = request_url.replace("{link-name}", encoded_vnf) ;
-			URL http_req_url =	new URL(request_url);
-
-			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.PUT);
-
-            OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
-            osw.write(json_text);
-            osw.flush();
-            osw.close();
-
-
-            LOGwriteFirstTrace("PUT", request_url);
-            LOGwriteDateTrace("link-name", linkName);
-            LOGwriteDateTrace("PhysicalLink", json_text);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            BufferedReader reader;
-            String line = null;
-            reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
-				return true;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
+			AAIRequest request = AAIRequest.getRequestFromResource("physical-link");
+			request.addRequestProperty("physical-link.link-name", linkName);
+			request.setRequestObject(data);
+			response = executor.post(request);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
-			LOG.warn("postPhysicalLinkData", exc);
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			try {
-				if(inputStream != null)
-				inputStream.close();
-			} catch (Exception exc) {
-
-			}
 		}
+		return response;
 	}
 
 	@Override
 	public boolean deletePhysicalLinkData(String linkName, String resourceVersion) throws AAIServiceException {
 		boolean response = false;
-		InputStream inputStream = null;
 
 		try {
-			String request_url = target_uri+physical_link_path;
-			String encoded_vnf = encodeQuery(linkName);
-			request_url = request_url.replace("{link-name}", encoded_vnf) ;
-			if(resourceVersion!=null) {
-				request_url = request_url +"?resource-version="+resourceVersion;
-			}
-			URL http_req_url =	new URL(request_url);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.DELETE);
-
-            LOGwriteFirstTrace("DELETE", http_req_url.toString());
-            LOGwriteDateTrace("link-name", linkName);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-            String line = null;
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", stringBuilder.toString());
-				response = true;
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-				LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-				response = false;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
+			AAIRequest request = AAIRequest.getRequestFromResource("physical-link");
+			request.addRequestProperty("physical-link.link-name", linkName);
+			response = executor.delete(request, resourceVersion);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("deletePhysicalLinkData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
 		return response;
 	}
@@ -1250,7 +928,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		try {
 			AAIRequest request = new PInterfaceRequest();
 			request.addRequestProperty(PInterfaceRequest.PINTERFACE_INTERFACE_NAME, interfaceName);
-			request.addRequestProperty(PInterfaceRequest.HOSTNAME, hostname);
+			request.addRequestProperty(PInterfaceRequest.PSERVER_HOSTNAME, hostname);
 			String rv = executor.get(request);
 			if(rv != null) {
 				ObjectMapper mapper = getObjectMapper();
@@ -1273,6 +951,8 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 			ObjectMapper mapper = getObjectMapper();
 			String json_text = mapper.writeValueAsString(request);
+
+			SSLSocketFactory sockFact = CTX.getSocketFactory();
 
 			String request_url = target_uri+p_interface_path;
 			String encoded_vnf = encodeQuery(hostname);
@@ -1339,75 +1019,21 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	@Override
 	public boolean deletePInterfaceData(String hostname, String interfaceName, String resourceVersion) throws AAIServiceException {
 		boolean response = false;
-		InputStream inputStream = null;
 
 		try {
-			String request_url = target_uri+p_interface_path;
-			String encoded_vnf = encodeQuery(hostname);
-			request_url = request_url.replace("{hostname}", encoded_vnf) ;
-			encoded_vnf = encodeQuery(interfaceName);
-			request_url = request_url.replace("{interface-name}", encoded_vnf) ;
-			if(resourceVersion!=null) {
-				request_url = request_url +"?resource-version="+resourceVersion;
-			}
-			URL http_req_url =	new URL(request_url);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.DELETE);
-
-            LOGwriteFirstTrace("DELETE", http_req_url.toString());
-            LOGwriteDateTrace("hostname", hostname);
-            LOGwriteDateTrace("interface-name", interfaceName);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-            String line = null;
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", stringBuilder.toString());
-				response = true;
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-				LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-				response = false;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
+			AAIRequest request = AAIRequest.getRequestFromResource("p-interface");
+			request.addRequestProperty("p-interface.interface-name", interfaceName);
+			request.addRequestProperty("pserver.hostname", hostname);
+			response = executor.delete(request, resourceVersion);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("deletePInterfaceData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
 		return response;
 	}
-
+	//================== End of SitePairSet =================
 	//==================== Service ======================
 	@Override
 	public Service requestServiceData(String serviceId) throws AAIServiceException {
@@ -1415,60 +1041,20 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		InputStream inputStream = null;
 
 		try {
-			String request_url = target_uri+service_path;
+			AAIRequest request = AAIRequest.getRequestFromResource("service");
+			request.addRequestProperty("service.service-id", serviceId);
 
-			String encoded_vnf = encodeQuery(serviceId);
-			request_url = request_url.replace("{service-id}", encoded_vnf) ;
-			URL http_req_url =	new URL(request_url);
 
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
-
-            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
-            LOGwriteDateTrace("service-id", serviceId);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK) {
-//				StringBuilder stringBuilder = new StringBuilder("\n");
-//				String line = null;
-//				while( ( line = reader.readLine() ) != null ) {
-//					stringBuilder.append("\n").append( line );
-//				}
-//				LOG.info(stringBuilder.toString());
-            	response = mapper.readValue(reader, Service.class);
-            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, Service.class);
+			}
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("requestServiceData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
 		return response;
 	}
@@ -1481,6 +1067,8 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 			ObjectMapper mapper = getObjectMapper();
 			String json_text = mapper.writeValueAsString(request);
+
+			SSLSocketFactory sockFact = CTX.getSocketFactory();
 
 			String request_url = target_uri+service_path;
 			String encoded_vnf = encodeQuery(linkName);
@@ -1542,71 +1130,20 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	}
 
 	@Override
-	public boolean deleteServiceData(String linkName, String resourceVersion) throws AAIServiceException {
+	public boolean deleteServiceData(String service_id, String resourceVersion) throws AAIServiceException {
 		boolean response = false;
-		InputStream inputStream = null;
 
 		try {
-			String request_url = target_uri+service_path;
-			String encoded_vnf = encodeQuery(linkName);
-			request_url = request_url.replace("{service-id}", encoded_vnf) ;
-			if(resourceVersion!=null) {
-				request_url = request_url +"?resource-version="+resourceVersion;
-			}
-			URL http_req_url =	new URL(request_url);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.DELETE);
-
-            LOGwriteFirstTrace("DELETE", http_req_url.toString());
-            LOGwriteDateTrace("service-id", linkName);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-            String line = null;
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", stringBuilder.toString());
-				response = true;
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-				LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-				response = false;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
+			AAIRequest request = AAIRequest.getRequestFromResource("service");
+			request.addRequestProperty("service.service-id", service_id);
+			response = executor.delete(request, resourceVersion);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("deleteServiceData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
+
 		return response;
 	}
 	//================== End of Service =================
@@ -1731,6 +1268,9 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
             HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.DELETE);
 
+//            SSLSocketFactory sockFact = CTX.getSocketFactory();
+//            con.setSSLSocketFactory( sockFact );
+
             LOGwriteFirstTrace("DELETE", http_req_url.toString());
 
 
@@ -1820,278 +1360,24 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
     }
 
 	@Override
-	public Pserver requestPServerData(String hostname) throws AAIServiceException {
-		Pserver response = null;
-		InputStream inputStream = null;
-
-		try {
-			String request_url = target_uri+network_pserver_path;
-			String encoded_vnf = encodeQuery(hostname);
-			request_url = request_url.replace("{hostname}", encoded_vnf) ;
-			URL http_req_url =	new URL(request_url);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
-
-            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
-            LOGwriteDateTrace("hostname", hostname);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK) {
-//				StringBuilder stringBuilder = new StringBuilder("\n");
-//				String line = null;
-//				while( ( line = reader.readLine() ) != null ) {
-//					stringBuilder.append("\n").append( line );
-//				}
-//				LOG.info(stringBuilder.toString());
-            	response = mapper.readValue(reader, Pserver.class);
-            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-            	return response;
-            } else {
-            	ErrorResponse errorresponse = new ErrorResponse();
-            	try {
-            		errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            		LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            		throw new AAIServiceException(responseCode, errorresponse);
-            	} catch(Exception exc) {
-            	}
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
-		} catch(AAIServiceException aaiexc) {
-			throw aaiexc;
-		} catch (Exception exc) {
-			LOG.warn("requestPServerData", exc);
-			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
-		}
-		return response;
-	}
-
-	@Override
-	public boolean postPServerData(String hostname, Pserver request) throws AAIServiceException {
-		InputStream inputStream = null;
-
-		try {
-
-			ObjectMapper mapper = getObjectMapper();
-			String json_text = mapper.writeValueAsString(request);
-
-			String request_url = target_uri+network_pserver_path;
-
-			request_url = request_url.replace("{hostname}", encodeQuery(hostname)) ;
-			URL http_req_url =	new URL(request_url);
-
-			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.PUT);
-
-            OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
-            osw.write(json_text);
-            osw.flush();
-            osw.close();
-
-
-            LOGwriteFirstTrace("PUT", request_url);
-            LOGwriteDateTrace("hostname", hostname);
-            LOGwriteDateTrace("PServer", json_text);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            BufferedReader reader;
-            String line = null;
-            reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
-				return true;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-		} catch(AAIServiceException aaiexc) {
-			throw aaiexc;
-		} catch (Exception exc) {
-			LOG.warn("postPServerData", exc);
-			throw new AAIServiceException(exc);
-		} finally {
-			try {
-				if(inputStream != null)
-				inputStream.close();
-			} catch (Exception exc) {
-
-			}
-		}
-	}
-
-	@Override
-	public boolean deletePServerData(String hostname, String resourceVersion) throws AAIServiceException {
-		boolean response = false;
-		InputStream inputStream = null;
-
-		try {
-
-			String request_url = target_uri+network_pserver_path;
-
-			String encoded_vnf = encodeQuery(hostname);
-			request_url = request_url.replace("{hostname}", encoded_vnf) ;
-			if(resourceVersion!=null) {
-				request_url = request_url +"?resource-version="+resourceVersion;
-			}
-			URL http_req_url =	new URL(request_url);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.DELETE);
-
-            LOGwriteFirstTrace("DELETE", http_req_url.toString());
-            LOGwriteDateTrace("hostname", hostname);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-            String line = null;
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", stringBuilder.toString());
-				response = true;
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-				LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-				response = true;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
-		} catch(AAIServiceException aaiexc) {
-			throw aaiexc;
-		} catch (Exception exc) {
-			LOG.warn("deletePServersData", exc);
-			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
-		}
-		return response;
-	}
-
-
-	@Override
 	public L3Network requestL3NetworkData(String networkId) throws AAIServiceException {
 		L3Network response = null;
 		InputStream inputStream = null;
 
 		try {
-			String request_url = target_uri+l3_network_path;
-			String encoded_vnf = encodeQuery(networkId);
-			request_url = request_url.replace("{network-id}", encoded_vnf) ;
-			URL http_req_url =	new URL(request_url);
+			AAIRequest request = AAIRequest.getRequestFromResource("l3-network");
+			request.addRequestProperty("l3-network.network-id", networkId);
 
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
-
-            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
-            LOGwriteDateTrace("network-id", networkId);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK) {
-//				StringBuilder stringBuilder = new StringBuilder("\n");
-//				String line = null;
-//				while( ( line = reader.readLine() ) != null ) {
-//					stringBuilder.append("\n").append( line );
-//				}
-//				LOG.info(stringBuilder.toString());
-            	response = mapper.readValue(reader, L3Network.class);
-            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-            	return response;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, L3Network.class);
+			}
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("requestL3NetworkData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
 		return response;
 	}
@@ -2102,53 +1388,19 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		InputStream inputStream = null;
 
 		try {
-			String request_url = target_uri+l3_network_path_query_name;
-			String encoded_name = encodeQuery(networkName);
-			request_url = request_url.replace("{network-name}", encoded_name) ;
-			URL http_req_url =	new URL(request_url);
+			AAIRequest request = AAIRequest.getRequestFromResource("l3-network");
+			request.addRequestProperty("l3-network.network-name", networkName);
 
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
-
-            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
-            LOGwriteDateTrace("network-name", networkName);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK) {
-//				StringBuilder stringBuilder = new StringBuilder("\n");
-//				String line = null;
-//				while( ( line = reader.readLine() ) != null ) {
-//					stringBuilder.append("\n").append( line );
-//				}
-//				LOG.info(stringBuilder.toString());
-            	response = mapper.readValue(reader, L3Network.class);
-            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-            	return response;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, L3Network.class);
+			}
 
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
-			LOG.warn("requestL3NetworkData", exc);
+			LOG.warn("requestL3NetworkQueryByName", exc);
 			throw new AAIServiceException(exc);
 		} finally {
 			if(inputStream != null){
@@ -2163,141 +1415,37 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	}
 
 	@Override
-	public boolean postL3NetworkData(String networkId, L3Network request) throws AAIServiceException {
-		InputStream inputStream = null;
-
+	public boolean postL3NetworkData(String networkId, L3Network data) throws AAIServiceException {
+		boolean response = false;
 		try {
-
-			ObjectMapper mapper = getObjectMapper();
-			String json_text = mapper.writeValueAsString(request);
-
-			String request_url = target_uri+l3_network_path;
-
-			String encoded_vnf = encodeQuery(networkId);
-			request_url = request_url.replace("{network-id}", encoded_vnf) ;
-			URL http_req_url =	new URL(request_url);
-
-			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.PUT);
-
-            OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
-            osw.write(json_text);
-            osw.flush();
-            osw.close();
-
-
-            LOGwriteFirstTrace("PUT", request_url);
-            LOGwriteDateTrace("network-id", networkId);
-            LOGwriteDateTrace("GenericVnf", json_text);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            BufferedReader reader;
-            String line = null;
-            reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
-				return true;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
+			AAIRequest request = AAIRequest.getRequestFromResource("l3-network");
+			request.addRequestProperty("l3-network.network-id", networkId);
+			request.setRequestObject(data);
+			response = executor.post(request);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
-			LOG.warn("postL3NetworkData", exc);
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			try {
-				if(inputStream != null)
-				inputStream.close();
-			} catch (Exception exc) {
-
-			}
 		}
+		return response;
 	}
 
 	@Override
 	public boolean deleteL3NetworkData(String networkId, String resourceVersion) throws AAIServiceException {
 		boolean response = false;
-		InputStream inputStream = null;
 
 		try {
-			String request_url = target_uri+l3_network_path;
-
-			String encoded_vnf = encodeQuery(networkId);
-			request_url = request_url.replace("{network-id}", encoded_vnf) ;
-			if(resourceVersion!=null) {
-				request_url = request_url +"?resource-version="+resourceVersion;
-			}
-			URL http_req_url =	new URL(request_url);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.DELETE);
-
-            LOGwriteFirstTrace("DELETE", http_req_url.toString());
-            LOGwriteDateTrace("network-id", networkId);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-            String line = null;
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", stringBuilder.toString());
-				response = true;
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-				LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-				response = false;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
+			AAIRequest request = AAIRequest.getRequestFromResource("l3-network");
+			request.addRequestProperty("l3-network.network-id", networkId);
+			response = executor.delete(request, resourceVersion);
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("deleteL3NetworkData", exc);
 			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
 		}
+
 		return response;
 	}
 
@@ -2316,6 +1464,8 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 			ObjectMapper mapper = getObjectMapper();
 			String json_text = mapper.writeValueAsString(event);
+
+			SSLSocketFactory sockFact = CTX.getSocketFactory();
 
 			String request_url = target_uri+ubb_notify_path;
 			URL http_req_url =	new URL(request_url);
@@ -2543,10 +1693,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 		try {
 				entity = this.getResource(url.toString(), Vserver.class);
-		}
-		catch (Exception e)
-		{
-			LOG.error("Caught exception", e);
+		} catch (AAIServiceException exc) {
+			throw exc;
+		} catch (Exception e) {
+			throw new AAIServiceException(e);
 		}
 		return entity;
 	}
@@ -2568,10 +1718,8 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 				String data_type = datum.getResourceType();
 				entity = new URL(datum.getResourceLink());
 			}
-		}
-		catch (Exception e)
-		{
-			LOG.error("Caught exception", e);
+		} catch (Exception e) {
+			throw new AAIServiceException(e);
 		}
 		return entity;
 	}
@@ -2585,19 +1733,25 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			HttpURLConnection con = null;
 			URL requestUrl = null;
 
+			String requestId = UUID.randomUUID().toString();
+
 			try {
 
 	            if(request.getRequestObject() != null) {
-	            	 con = getConfiguredConnection(requestUrl = request.getRequestUrl(HttpMethod.POST, null), HttpMethod.POST);
+	            	requestUrl = request.getRequestUrl(HttpMethod.POST, null);
+	            	requestUrl = appendDepth(requestUrl, request);
+	            	con = getConfiguredConnection(requestUrl, HttpMethod.POST);
 	            	String json_text = request.toJSONString();
 	            	LOGwriteDateTrace("data", json_text);
-	            	logMetricRequest("POST "+requestUrl.getPath(), json_text);
+	            	logMetricRequest(requestId, "POST "+requestUrl.getPath(), json_text, requestUrl.getPath());
 	            	OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
 	            	osw.write(json_text);
 	            	osw.flush();
 	            } else {
-	            	con = getConfiguredConnection(requestUrl = request.getRequestUrl(HttpMethod.GET, null), HttpMethod.GET);
-	            	logMetricRequest("GET "+requestUrl.getPath(), "");
+	            	requestUrl = request.getRequestUrl(HttpMethod.GET, null);
+	            	requestUrl = appendDepth(requestUrl, request);
+	            	con = getConfiguredConnection(requestUrl, HttpMethod.GET);
+	            	logMetricRequest(requestId, "GET "+requestUrl.getPath(), "", requestUrl.getPath());
 	            }
 
 	            // Check for errors
@@ -2611,7 +1765,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	            // Process the response
 	            LOG.debug("HttpURLConnection result:" + responseCode + " : " + responseMessage);
-	            logMetricResponse(responseCode, responseMessage);
+	            logMetricResponse(requestId, responseCode, responseMessage);
 
 	            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
 	            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
@@ -2692,15 +1846,41 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			return response;
 		}
 
+		private URL appendDepth(URL requestUrl, AAIRequest request) throws MalformedURLException {
+
+			String depth = request.requestProperties.getProperty("depth", "1");
+			String path = requestUrl.toString();
+			if(path.contains("?depth=") || path.contains("&depth=")) {
+				return requestUrl;
+			} else {
+				if(path.contains("?")) {
+					path = String.format("%s&depth=%s", path, depth);
+				} else {
+					path = String.format("%s?depth=%s", path, depth);
+				}
+				return new URL(path);
+			}
+		}
+
 		@Override
 		public Boolean post(AAIRequest request) throws AAIServiceException {
 			InputStream inputStream = null;
+			String requestId = UUID.randomUUID().toString();
 
 			try {
 				String resourceVersion = null;
 				AAIDatum instance = request.getRequestObject();
-				if(instance instanceof ResourceVersion) {
-					resourceVersion = ((ResourceVersion)instance).getResourceVersion();
+
+				Method getResourceVersionMethod = instance.getClass().getMethod("getResourceVersion");
+				if(getResourceVersionMethod != null){
+					try {
+						getResourceVersionMethod.setAccessible(true);
+						Object object = getResourceVersionMethod.invoke(instance);
+						if(object != null)
+							resourceVersion = object.toString();
+					} catch (InvocationTargetException x) {
+						Throwable cause = x.getCause();
+					}
 				}
 
 				URL requestUrl = null;
@@ -2709,7 +1889,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 				String json_text = request.toJSONString();
 
 				LOGwriteDateTrace("data", json_text);
-				logMetricRequest("PUT "+requestUrl.getPath(), json_text);
+				logMetricRequest(requestId, "PUT "+requestUrl.getPath(), json_text, requestUrl.getPath());
 
 				OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
 	            osw.write(json_text);
@@ -2725,7 +1905,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	            }
 
 	            LOG.debug("HttpURLConnection result:" + responseCode + " : " + responseMessage);
-	            logMetricResponse(responseCode, responseMessage);
+	            logMetricResponse(requestId,responseCode, responseMessage);
 
 	            // Process the response
 	            BufferedReader reader;
@@ -2766,6 +1946,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		public Boolean delete(AAIRequest request, String resourceVersion) throws AAIServiceException {
 			Boolean response = null;
 			InputStream inputStream = null;
+			String requestId = UUID.randomUUID().toString();
 
 			if(resourceVersion == null) {
 				throw new AAIServiceException("resource-version is required for DELETE request");
@@ -2774,7 +1955,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			try {
 				URL requestUrl = null;
 	            HttpURLConnection conn = getConfiguredConnection(requestUrl = request.getRequestUrl(HttpMethod.DELETE, resourceVersion), HttpMethod.DELETE);
-	            logMetricRequest("DELETE "+requestUrl.getPath(), "");
+	            logMetricRequest(requestId, "DELETE "+requestUrl.getPath(), "", requestUrl.getPath());
 	            conn.setDoOutput(true);
 //	            if(request.isDeleteDataRequired()) {
 //					String json_text = request.toJSONString();
@@ -2797,7 +1978,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	            // Process the response
 	            LOG.debug("HttpURLConnection result:" + responseCode + " : " + responseMessage);
-	            logMetricResponse(responseCode, responseMessage);
+	            logMetricResponse(requestId,responseCode, responseMessage);
 
 	            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
 	            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
@@ -2844,10 +2025,11 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			InputStream inputStream = null;
 			HttpURLConnection con = null;
 			URL requestUrl = null;
+			String requestId = UUID.randomUUID().toString();
 
 			try {
 	            con = getConfiguredConnection(requestUrl = request.getRequestQueryUrl(HttpMethod.GET), HttpMethod.GET);
-	            logMetricRequest("GET "+requestUrl.getPath(), "");
+	            logMetricRequest(requestId, "GET "+requestUrl.getPath(), "", requestUrl.getPath());
 
 	            // Check for errors
 	            String responseMessage = con.getResponseMessage();
@@ -2858,7 +2040,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	            	inputStream = con.getErrorStream();
 	            }
 
-	            logMetricResponse(responseCode, responseMessage);
+	            logMetricResponse(requestId,responseCode, responseMessage);
 	            ObjectMapper mapper = getObjectMapper();
 
 				if (responseCode == HttpURLConnection.HTTP_OK) {
@@ -2894,6 +2076,83 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			return response;
 		}
 
+		@Override
+		public Boolean patch(AAIRequest request, String resourceVersion) throws AAIServiceException {
+			InputStream inputStream = null;
+			String requestId = UUID.randomUUID().toString();
+
+			try {
+				AAIDatum instance = request.getRequestObject();
+				if(instance instanceof ResourceVersion) {
+					resourceVersion = ((ResourceVersion)instance).getResourceVersion();
+				}
+
+				URL requestUrl = null;
+				HttpURLConnection con = getConfiguredConnection(requestUrl = request.getRequestUrl("PATCH", resourceVersion), "PATCH");
+				ObjectMapper mapper = getObjectMapper();
+				String json_text = request.toJSONString();
+
+				LOGwriteDateTrace("data", json_text);
+				logMetricRequest(requestId, "PATCH "+requestUrl.getPath(), json_text, requestUrl.getPath());
+
+				OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
+	            osw.write(json_text);
+	            osw.flush();
+
+	            // Check for errors
+	            String responseMessage = con.getResponseMessage();
+	            int responseCode = con.getResponseCode();
+	            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+	            	inputStream = con.getInputStream();
+	            } else {
+	            	inputStream = con.getErrorStream();
+	            }
+
+	            LOG.info("HttpURLConnection result: " + responseCode + " : " + responseMessage);
+	            logMetricResponse(requestId,responseCode, responseMessage);
+
+	            // Process the response
+	            BufferedReader reader;
+	            String line = null;
+	            reader = new BufferedReader( new InputStreamReader( inputStream ) );
+	            mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+				if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+					StringBuilder stringBuilder = new StringBuilder();
+
+					while( ( line = reader.readLine() ) != null ) {
+						stringBuilder.append( line );
+					}
+					LOGwriteEndingTrace(responseCode, responseMessage, (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
+					return true;
+	            } else {
+					StringBuilder stringBuilder = new StringBuilder();
+
+					while( ( line = reader.readLine() ) != null ) {
+						stringBuilder.append("\n").append( line );
+					}
+					LOG.info(stringBuilder.toString());
+
+
+	            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
+	            	LOGwriteEndingTrace(responseCode, responseMessage, mapper.writeValueAsString(errorresponse));
+
+	            	throw new AAIServiceException(responseCode, errorresponse);
+	            }
+			} catch(AAIServiceException aaiexc) {
+				throw aaiexc;
+			} catch (Exception exc) {
+				LOG.warn("AAIRequestExecutor.patch", exc);
+				throw new AAIServiceException(exc);
+			} finally {
+				try {
+					if(inputStream != null)
+					inputStream.close();
+				} catch (Exception exc) {
+
+				}
+			}
+		}
 	}
 
 	@Override
@@ -3031,73 +2290,6 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		return LOG;
 	}
 
-	@Override
-	public boolean updateAnAIEntry(Update request) throws AAIServiceException {
-		InputStream inputStream = null;
-
-		try {
-
-			ObjectMapper mapper = getObjectMapper();
-			String json_text = mapper.writeValueAsString(request);
-
-			String request_url = target_uri+update_path;
-			URL http_req_url =	new URL(request_url);
-
-			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.PUT);
-
-            OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
-            osw.write(json_text);
-            osw.flush();
-            osw.close();
-
-            LOGwriteFirstTrace("PUT", request_url);
-            LOGwriteDateTrace("Update", json_text);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            BufferedReader reader;
-            String line = null;
-            reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-				StringBuilder stringBuilder = new StringBuilder();
-
-				while( ( line = reader.readLine() ) != null ) {
-					stringBuilder.append( line );
-				}
-				LOGwriteEndingTrace(responseCode, "SUCCESS", (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
-				return true;
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-				ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-				LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-				throw new AAIServiceException(responseCode, errorresponse);
-			} else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-		} catch(AAIServiceException aaiexc) {
-			throw aaiexc;
-		} catch (Exception exc) {
-			LOG.warn("updateAnAIEntry", exc);
-			throw new AAIServiceException(exc);
-		} finally {
-			try {
-				if(inputStream != null)
-				inputStream.close();
-			} catch (Exception exc) {
-
-			}
-		}
-	}
 
 	@Override
 	public AAIRequestExecutor getExecutor() {
@@ -3210,6 +2402,8 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		try {
             HttpURLConnection con = getConfiguredConnection(httpReqUrl, HttpMethod.DELETE);
 
+//            SSLSocketFactory sockFact = CTX.getSocketFactory();
+//            con.setSSLSocketFactory( sockFact );
             OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
             osw.write(json_text);
             osw.flush();
@@ -3269,16 +2463,17 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		return response;
 	}
 
-	public ObjectMapper getObjectMapper() {
+	public static ObjectMapper getObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
 	    AnnotationIntrospector introspector = new JaxbAnnotationIntrospector(TypeFactory.defaultInstance());
 	    AnnotationIntrospector secondary = new JacksonAnnotationIntrospector();
 	    mapper.setAnnotationIntrospector(AnnotationIntrospector.pair(introspector, secondary));
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        mapper.setSerializationInclusion(Include.NON_NULL);
         return mapper;
 	}
 
-	public void logMetricRequest(String targetServiceName, String msg){
+	public void logMetricRequest(String requestId, String targetServiceName, String msg, String path){
 		String svcInstanceId = "";
 		String svcName = null;
 		String partnerName = null;
@@ -3287,15 +2482,154 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 		targetServiceName = "";
 
-		ml.logRequest(svcInstanceId, svcName, partnerName, targetEntity, targetServiceName, targetVirtualEntity, msg);
+//		ml.logRequest(svcInstanceId, svcName, partnerName, targetEntity, targetServiceName, targetVirtualEntity, msg);
 	}
 
-	public void logMetricResponse(int responseCode, String responseDescription){
-		ml.logResponse(responseCode < 400 ? "SUCCESS" : "FAILURE", Integer.toBinaryString(responseCode), responseDescription);
+	public void logMetricResponse(String requestId, int responseCode, String responseDescription){
+//		ml.logResponse(responseCode < 400 ? "SUCCESS" : "FAILURE", Integer.toBinaryString(responseCode), responseDescription);
 	}
 
 	public void logKeyError(String keys){
 	    LOG.error("Atleast one of the keys [" + keys + "] should have been populated. This will cause a NPE.");
+	}
+
+
+	/**
+	 * Retrofit code
+	 */
+	@Override
+	public QueryStatus save(String resource, boolean force, boolean localOnly, String key, Map<String, String> params, String prefix, SvcLogicContext ctx)
+			throws SvcLogicException {
+
+		switch(resource){
+		case "generic-query":
+		case "named-query":
+		case "nodes-query":
+		case "linterface":
+		case "l2-bridge-sbg":
+		case "l2-bridge-bgf":
+		case "echo":
+		case "test":
+			break;
+
+		default:
+			if(key.contains(String.format("%s.", resource))) {
+				key = rewriteKey(resource, key, ctx);
+			}
+		}
+		return super.save(resource, force, localOnly, key, params, prefix, ctx);
+	}
+
+	@Override
+	public QueryStatus query(String resource, boolean localOnly, String select, String key, String prefix, String orderBy, SvcLogicContext ctx)
+		throws SvcLogicException {
+
+		switch(resource){
+		case "generic-query":
+		case "named-query":
+		case "nodes-query":
+		case "linterface":
+		case "l2-bridge-sbg":
+		case "l2-bridge-bgf":
+		case "echo":
+		case "test":
+			break;
+
+		default:
+			if(!key.contains(String.format("%s.", resource))) {
+				key = rewriteKey(resource, key, ctx);
+			}
+		}
+
+		return super.query(resource, localOnly, select, key, prefix, orderBy, ctx);
+	}
+
+	@Override
+	public QueryStatus delete(String resource, String key, SvcLogicContext ctx) throws SvcLogicException {
+		switch(resource){
+		case "generic-query":
+		case "named-query":
+		case "nodes-query":
+		case "linterface":
+		case "l2-bridge-sbg":
+		case "l2-bridge-bgf":
+		case "echo":
+		case "test":
+			break;
+
+		default:
+			if(key.contains(String.format("%s.", resource))) {
+				key = rewriteKey(resource, key, ctx);
+			}
+		}
+
+		return super.delete(resource, key, ctx);
+	}
+
+	@Override
+	public QueryStatus update(String resource, String key, Map<String, String> params, String prefix, SvcLogicContext ctx) throws SvcLogicException {
+		switch(resource){
+		case "generic-query":
+		case "named-query":
+		case "nodes-query":
+		case "linterface":
+		case "l2-bridge-sbg":
+		case "l2-bridge-bgf":
+		case "echo":
+		case "test":
+			break;
+
+		default:
+			if(key.contains(String.format("%s.", resource))) {
+				key = rewriteKey(resource, key, ctx);
+			}
+		}
+
+		return super.update(resource, key, params, prefix, ctx);
+	}
+
+	private String rewriteKey(String resource, String key, SvcLogicContext ctx) {
+
+		Class<? extends AAIDatum> clazz = null;
+		try {
+			clazz = AAIRequest.getClassFromResource(resource) ;
+		} catch (ClassNotFoundException e) {
+			LOG.warn("AAIRequest does not support class: " + e.getMessage());
+			return key;
+		}
+		if(clazz == null)
+			return key;
+
+		List<String> fieldAnnotatedNames = new LinkedList<String>();
+
+		Field[] fields = clazz.getDeclaredFields();
+		for(Field field : fields) {
+			String fieldName = field.getName();
+			XmlElement annotation = field.getAnnotation(XmlElement.class);
+			if(annotation == null)
+				continue;
+			String primaryId = annotation.name();
+			if("##default".equals(primaryId)) {
+				primaryId = fieldName;
+			}
+			fieldAnnotatedNames.add(primaryId);
+		}
+
+		HashMap<String, String> nameValues = keyToHashMap(key, ctx);
+		Set<String> keyset = nameValues.keySet();
+		for(String keyName : keyset) {
+			if(keyName.contains("."))
+				continue;
+			else {
+				String tmpKeyName = keyName.replaceAll("_", "-");
+				if(fieldAnnotatedNames.contains(tmpKeyName)) {
+					key = key.replace(tmpKeyName, String.format("%s.%s", resource, tmpKeyName));
+				}
+			}
+		}
+
+
+		return key;
 	}
 
 }

@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,11 +109,6 @@ public interface AAIClient extends SvcLogicResource, SvcLogicJavaPlugin {
 	public boolean postPhysicalLinkData(String vnf_id, PhysicalLink request) throws AAIServiceException;
 	public boolean deletePhysicalLinkData(String vnf_id, String resourceVersion) throws AAIServiceException;
 
-	// PServers
-	public Pserver requestPServerData(String hostname) throws AAIServiceException;
-	public boolean postPServerData(String hostname, Pserver server) throws AAIServiceException;
-	public boolean deletePServerData(String hostname, String resourceVersion) throws AAIServiceException;
-
 	// L3Networks
 	public L3Network requestL3NetworkData(String networkId) throws AAIServiceException;
 	public L3Network requestL3NetworkQueryByName(String networkId) throws AAIServiceException;
@@ -131,20 +126,15 @@ public interface AAIClient extends SvcLogicResource, SvcLogicJavaPlugin {
 	// Node Query - 1602
 	public SearchResults requestNodeQuery(String type, String entityIdentifier, String entityName) throws AAIServiceException;
 	public String requestDataByURL(URL url) throws AAIServiceException;
-//	public Object requestDataInstanceNodeQuery(String type, String vnf_name) throws AAIServiceException;
 	public GenericVnf requestGenericVnfeNodeQuery(String vnf_name) throws AAIServiceException;
 
 	//	// tenant
 	public Tenant requestTenantData(String tenant_id, String cloudOwner, String cloudRegionId) throws AAIServiceException;
 	public Tenant requestTenantDataByName(String tenant_name, String cloudOwner, String cloudRegionId) throws AAIServiceException;
 	public boolean postTenantData(String tenant_id, String cloudOwner, String cloudRegionId, Tenant request) throws AAIServiceException;
-//	public boolean deleteGenericVnfData(String vnf_id, String resourceVersion) throws AAIServiceException;
-
-	public boolean updateAnAIEntry(Update entity) throws AAIServiceException;
 
 	public QueryStatus backup(Map<String, String> params, SvcLogicContext ctx) throws SvcLogicException;
 	public QueryStatus restore(Map<String, String> params, SvcLogicContext ctx) throws SvcLogicException;
 
 	public void logKeyError(String keys);
-	ObjectMapper getObjectMapper();
 }

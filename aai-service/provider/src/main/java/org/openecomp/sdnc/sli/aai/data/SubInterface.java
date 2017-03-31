@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ import org.openecomp.aai.inventory.v8.Vlans;
     "vlans",
     "relationshipList"
 })
-public class SubInterface implements AAIDatum, ResourceVersion {
+public class SubInterface implements AAIDatum {
 
     @JsonProperty("interface-name")
     private String interfaceName;
@@ -59,7 +59,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
     /**
-     * 
+     *
      * @return
      *     The interfaceName
      */
@@ -69,7 +69,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @param interfaceName
      *     The interface-name
      */
@@ -79,7 +79,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @return
      *     The interfaceRole
      */
@@ -89,7 +89,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @param interfaceRole
      *     The interface-role
      */
@@ -99,7 +99,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @return
      *     The resourceVersion
      */
@@ -109,7 +109,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @param resourceVersion
      *     The resource-version
      */
@@ -119,7 +119,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @return
      *     The vlans
      */
@@ -129,7 +129,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @param vlans
      *     The vlans
      */
@@ -139,7 +139,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @return
      *     The relationshipList
      */
@@ -149,7 +149,7 @@ public class SubInterface implements AAIDatum, ResourceVersion {
     }
 
     /**
-     * 
+     *
      * @param relationshipList
      *     The relationshipList
      */
