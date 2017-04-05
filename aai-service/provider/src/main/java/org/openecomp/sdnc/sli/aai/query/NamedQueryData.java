@@ -26,7 +26,6 @@ import java.util.Map;
 import javax.annotation.Generated;
 
 import org.openecomp.sdnc.sli.aai.data.AAIDatum;
-
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;

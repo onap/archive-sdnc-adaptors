@@ -55,7 +55,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v8.GenericVnf;
+import org.openecomp.aai.inventory.v10.*;
 
 public abstract class AAIRequest {
 	protected static final Logger LOG = LoggerFactory.getLogger(AAIRequest.class);
@@ -355,7 +355,7 @@ public abstract class AAIRequest {
 		return false;
 	}
 
-	public static ObjectMapper getObjectMapper() {
+	ObjectMapper getObjectMapper() {
         return AAIService.getObjectMapper();
 	}
 

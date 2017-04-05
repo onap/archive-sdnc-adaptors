@@ -28,6 +28,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -57,23 +58,7 @@ import org.openecomp.sdnc.sli.aai.query.NamedQueryData;
 import org.openecomp.sdnc.sli.aai.query.QueryParameters;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v8.GenericVnf;
-import org.openecomp.aai.inventory.v8.InventoryResponseItem;
-import org.openecomp.aai.inventory.v8.InventoryResponseItems;
-import org.openecomp.aai.inventory.v8.L3Network;
-import org.openecomp.aai.inventory.v8.LogicalLink;
-import org.openecomp.aai.inventory.v8.Metadata;
-import org.openecomp.aai.inventory.v8.Metadatum;
-import org.openecomp.aai.inventory.v8.Pnf;
-import org.openecomp.aai.inventory.v8.Relationship;
-import org.openecomp.aai.inventory.v8.RelationshipData;
-import org.openecomp.aai.inventory.v8.RelationshipList;
-import org.openecomp.aai.inventory.v8.ResultData;
-import org.openecomp.aai.inventory.v8.SearchResults;
-import org.openecomp.aai.inventory.v8.ServiceInstance;
-import org.openecomp.aai.inventory.v8.Vlan;
-import org.openecomp.aai.inventory.v8.Vlans;
-import org.openecomp.aai.inventory.v8.Vserver;
+import org.openecomp.aai.inventory.v10.*;
 
 
 public abstract class AAIDeclarations implements AAIClient {
@@ -1535,20 +1520,20 @@ public abstract class AAIDeclarations implements AAIClient {
 					if(relatedLink != null) {
 						relationship.setRelatedLink(relatedLink);
 				} else  {
-					List<RelationshipData> relData = relationship.getRelationshipData();
+				List<RelationshipData> relData = relationship.getRelationshipData();
 
-					while(true) {
-						String searchRelationshipKey = "relationship-list.relationship[" + i + "].relationship-data[" + j + "].relationship-key";
-						String searchRelationshipValue = "relationship-list.relationship[" + i + "].relationship-data[" + j + "].relationship-value";
-						if(!params.containsKey(searchRelationshipKey))
-							break;
+				while(true) {
+					String searchRelationshipKey = "relationship-list.relationship[" + i + "].relationship-data[" + j + "].relationship-key";
+					String searchRelationshipValue = "relationship-list.relationship[" + i + "].relationship-data[" + j + "].relationship-value";
+					if(!params.containsKey(searchRelationshipKey))
+						break;
 
-						RelationshipData relDatum = new RelationshipData();
-						relDatum.setRelationshipKey(params.get(searchRelationshipKey));
-						relDatum.setRelationshipValue(params.get(searchRelationshipValue));
-						relData.add(relDatum);
-						j++;
-					}
+					RelationshipData relDatum = new RelationshipData();
+					relDatum.setRelationshipKey(params.get(searchRelationshipKey));
+					relDatum.setRelationshipValue(params.get(searchRelationshipValue));
+					relData.add(relDatum);
+					j++;
+				}
 				}
 
 
@@ -1807,6 +1792,9 @@ public abstract class AAIDeclarations implements AAIClient {
 			relatedTo = relatedTo.replaceAll("_", "-");
 
 			String relatedLink = nameValues.get("relationship.related_link");
+			if(relatedLink != null) {
+				relatedLink = URLDecoder.decode(relatedLink, "UTF-8");
+			}
 
 			List<Relationship> relationships = relationshipList.getRelationship();
 			List<Relationship> relationshipsToDelete = new LinkedList<Relationship>();
@@ -1814,13 +1802,19 @@ public abstract class AAIDeclarations implements AAIClient {
 			for(Relationship relationship : relationships) {
 				if(relatedTo.equals(relationship.getRelatedTo())) {
 					if(relatedLink != null) {
-						if(relationship.getRelatedLink() == null || !relationship.getRelatedLink().endsWith(relatedLink)) {
-							continue;
+						if(relationship.getRelatedLink() != null ) {
+							String localRelatedLink = relationship.getRelatedLink();
+							localRelatedLink = URLDecoder.decode(localRelatedLink, "UTF-8");
+							if(localRelatedLink.endsWith(relatedLink)) {
+								getLogger().debug(String.format("Found relationship of '%s' to keyword '%s'", relationship.getRelatedTo(),  relatedTo));
+								relationshipsToDelete.add(relationship);
 						}
 					}
+					} else {
 					getLogger().debug(String.format("Found relationship of '%s' to keyword '%s'", relationship.getRelatedTo(),  relatedTo));
 					relationshipsToDelete.add(relationship);
 				}
+			}
 			}
 			if(relationshipsToDelete == null || relationshipsToDelete.isEmpty()) {
 				getLogger().info(String.format("Relationship has not been found for %s", key));

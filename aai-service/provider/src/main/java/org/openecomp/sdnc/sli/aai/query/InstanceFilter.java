@@ -33,14 +33,15 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
-import org.openecomp.aai.inventory.v8.LogicalLink;
-import org.openecomp.aai.inventory.v8.Pnf;
+import org.openecomp.aai.inventory.v10.*;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Generated("org.jsonschema2pojo")
 @JsonPropertyOrder({
     "logical-link",
-    "pnf"
+    "pnf",
+    "l3-network",
+    "service-instance"
 })
 public class InstanceFilter {
 
@@ -48,11 +49,16 @@ public class InstanceFilter {
     private LogicalLink logicalLink;
     @JsonProperty("pnf")
     private Pnf pnf;
+	@JsonProperty("l3-network")
+    private L3Network l3Network;
+	@JsonProperty("service-instance")
+    private ServiceInstance serviceInstance;
+
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
     /**
-     * 
+     *
      * @return
      *     The logicalLink
      */
@@ -62,7 +68,7 @@ public class InstanceFilter {
     }
 
     /**
-     * 
+     *
      * @param logicalLink
      *     The logical-link
      */
@@ -72,7 +78,7 @@ public class InstanceFilter {
     }
 
     /**
-     * 
+     *
      * @return
      *     The pnf
      */
@@ -82,7 +88,7 @@ public class InstanceFilter {
     }
 
     /**
-     * 
+     *
      * @param pnf
      *     The pnf
      */
@@ -90,6 +96,16 @@ public class InstanceFilter {
     public void setPnf(Pnf pnf) {
         this.pnf = pnf;
     }
+
+    @JsonProperty("l3-network")
+    public L3Network getL3Network() {
+		return l3Network;
+	}
+
+    @JsonProperty("l3-network")
+    public void setL3Network(L3Network l3Network) {
+		this.l3Network = l3Network;
+	}
 
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
@@ -100,5 +116,15 @@ public class InstanceFilter {
     public void setAdditionalProperty(String name, Object value) {
         this.additionalProperties.put(name, value);
     }
+
+    @JsonProperty("service-instance")
+	public ServiceInstance getServiceInstance() {
+		return serviceInstance;
+	}
+
+    @JsonProperty("service-instance")
+	public void setServiceInstance(ServiceInstance serviceInstance) {
+		this.serviceInstance = serviceInstance;
+	}
 
 }

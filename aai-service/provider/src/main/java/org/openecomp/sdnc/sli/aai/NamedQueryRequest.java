@@ -24,26 +24,32 @@ package org.openecomp.sdnc.sli.aai;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 
 import org.openecomp.sdnc.sli.aai.data.AAIDatum;
 
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.AnnotationIntrospector;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationIntrospector;
 
-import org.openecomp.aai.inventory.v8.InventoryResponseItems;
+import org.openecomp.aai.inventory.v10.InventoryResponseItems;
 
 public class NamedQueryRequest extends AAIRequest {
 
 	public static final String NAMED_SEARCH_PATH			= "org.openecomp.sdnc.sli.aai.query.named";
-	
+
 	private final String named_search_path;
-	
+
 	public static final String NAMED_QUERY_UUID = "named-query-uuid";
 	public static final String PREFIX = "prefix";
 
@@ -65,19 +71,23 @@ public class NamedQueryRequest extends AAIRequest {
 		URL http_req_url =	new URL(request_url);
 
 		aaiService.LOGwriteFirstTrace(method, http_req_url.toString());
-		
+
 		return http_req_url;
 	}
-	
+
 	@Override
-	public URL getRequestQueryUrl(String method) throws UnsupportedEncodingException, MalformedURLException {	
+	public URL getRequestQueryUrl(String method) throws UnsupportedEncodingException, MalformedURLException {
 		return getRequestUrl(method, null);
 	}
 
 
 	@Override
 	public String toJSONString() {
-		ObjectMapper mapper = new ObjectMapper();
+		ObjectMapper mapper = AAIService.getObjectMapper();
+		mapper.setSerializationInclusion(Include.NON_NULL);
+		mapper.setSerializationInclusion(Include.NON_EMPTY);
+		mapper.setSerializationInclusion(Include.NON_DEFAULT);
+
 	    AnnotationIntrospector introspector = new JaxbAnnotationIntrospector(TypeFactory.defaultInstance());
 	    AnnotationIntrospector secondary = new JacksonAnnotationIntrospector();
 	    mapper.setAnnotationIntrospector(AnnotationIntrospector.pair(introspector, secondary));
@@ -86,6 +96,54 @@ public class NamedQueryRequest extends AAIRequest {
         AAIDatum tenant = (AAIDatum)requestDatum;
 		String json_text = null;
 		try {
+			ObjectNode node = mapper.valueToTree(tenant);
+			Iterator<JsonNode> it = node.elements();
+			while(it.hasNext()){
+				JsonNode jn = it.next();
+				JsonNode child = jn.get("instance-filter");
+				if(child != null) {
+					child = child.get(0);
+					if(child.has("l3-network")) {
+						JsonNode innerChild =  child.get("l3-network");
+						if(innerChild != null) {
+							if(innerChild instanceof ObjectNode) {
+								ObjectNode on = ObjectNode.class.cast(innerChild);
+								List<String> namesToDelete = new ArrayList<String>();
+								Iterator<String> names = on.fieldNames();
+								while(names.hasNext()) {
+									String name = names.next();
+									if(name != null && name.startsWith("is-")) {
+										namesToDelete.add(name);
+									}
+								}
+								for(String nameToDelete : namesToDelete) {
+									on.remove(nameToDelete);
+								}
+							}
+						}
+					} else if(child.has("pnf")) {
+						JsonNode innerChild =  child.get("pnf");
+						if(innerChild != null) {
+							if(innerChild instanceof ObjectNode) {
+								ObjectNode on = ObjectNode.class.cast(innerChild);
+								List<String> namesToDelete = new ArrayList<String>();
+								Iterator<String> names = on.fieldNames();
+								while(names.hasNext()) {
+									String name = names.next();
+									if(name != null && name.startsWith("in-maint")) {
+										namesToDelete.add(name);
+									}
+								}
+								for(String nameToDelete : namesToDelete) {
+									on.remove(nameToDelete);
+								}
+							}
+						}
+					}
+				}
+			}
+			json_text = node.toString();
+			if(json_text == null)
 			json_text = mapper.writeValueAsString(tenant);
 		} catch (JsonProcessingException exc) {
 			handleException(this, exc);
@@ -113,7 +171,7 @@ public class NamedQueryRequest extends AAIRequest {
 
 		String encoded_vnf ;
 		String key = NAMED_QUERY_UUID;
-		
+
 		if(requestProperties.containsKey(key)) {
 			encoded_vnf = encodeQuery(requestProperties.getProperty(key));
 			request_url = request_url.replace("{named-query-uuid}", encoded_vnf) ;
@@ -121,7 +179,7 @@ public class NamedQueryRequest extends AAIRequest {
 		}
 
 		key = PREFIX;
-		
+
 		if(requestProperties.containsKey(key)) {
 			encoded_vnf = encodeQuery(requestProperties.getProperty(key));
 			request_url = request_url.replace("{prefix}", encoded_vnf) ;

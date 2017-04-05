@@ -110,15 +110,6 @@
 
 	<build>
 		<plugins>
-                        <plugin>
-                                <groupId>org.apache.maven.plugins</groupId>
-                                <artifactId>maven-compiler-plugin</artifactId>
-                                <configuration>
-                                        <source>1.7</source>
-                                        <target>1.7</target>
-                                </configuration>
-                        </plugin>
-
 			<plugin>
 				<groupId>org.apache.felix</groupId>
 				<artifactId>maven-bundle-plugin</artifactId>
@@ -134,32 +125,31 @@
 						<Embed-Transitive>true</Embed-Transitive>
 					</instructions>
 
-
+					<manifestLocation>${project.basedir}/src/main/resources/META-INF</manifestLocation>
 				</configuration>
-
 			</plugin>
-
 			<plugin>
 				<groupId>org.jvnet.jaxb2.maven2</groupId>
 				<artifactId>maven-jaxb2-plugin</artifactId>
 				<version>0.13.1</version>
 				<executions>
 					<execution>
+					<id>gen-xjc</id>
 						<goals>
 							<goal>generate</goal>
 						</goals>
 					</execution>
 				</executions>
 				<configuration>
+					<schemaDirectory>${project.basedir}/src/main/resources</schemaDirectory>
 					<schemaIncludes>
 						<value>aai_schema_v8.xsd</value>
 					</schemaIncludes>
 					<bindingIncludes>
 						<include>aai-schema-bindings.xjb</include>
 					</bindingIncludes>
-					<schemaDirectory>${project.basedir}/src/main/resources</schemaDirectory>
-					<generateDirectory>${project.basedir}/src/main/java</generateDirectory>
-                                        <generatePackage>org.openecomp.aai.inventory.v8</generatePackage>
+					<generateDirectory>${project.build.directory}/generated-sources/main/java</generateDirectory>
+                                        <generatePackage>org.openecomp.aai.inventory.v10</generatePackage>
 					<extension>true</extension>
 				<args>
 					<arg>-Xannotate</arg>

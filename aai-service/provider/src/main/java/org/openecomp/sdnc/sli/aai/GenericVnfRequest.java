@@ -31,17 +31,17 @@ import org.openecomp.sdnc.sli.aai.data.AAIDatum;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v8.GenericVnf;
+import org.openecomp.aai.inventory.v10.GenericVnf;
 
 public class GenericVnfRequest extends AAIRequest {
 
 	// tenant (1602)
 	public static final String GENERIC_VNF_PATH			= "org.openecomp.sdnc.sli.aai.path.generic.vnf";
 	public static final String GENERIC_VNF_QUERY_PATH	= "org.openecomp.sdnc.sli.aai.path.generic.vnf.query";
-	
+
 	private final String generic_vnf_path;
 	private final String generic_vnf_query_path;
-	
+
 	public static final String GENERIC_VNF_ID = "generic_vnf.vnf_id";
 	public static final String VNF_ID = "vnf_id";
 
@@ -51,7 +51,7 @@ public class GenericVnfRequest extends AAIRequest {
 		generic_vnf_query_path = configProperties.getProperty(GENERIC_VNF_QUERY_PATH);
 	}
 
-	
+
 	@Override
 	public URL getRequestUrl(String method, String resourceVersion) throws UnsupportedEncodingException, MalformedURLException {
 
@@ -60,11 +60,11 @@ public class GenericVnfRequest extends AAIRequest {
 		if(requestProperties.containsKey(GENERIC_VNF_ID)) {
 			key = GENERIC_VNF_ID;
 		}
-		
+
 		if(!requestProperties.containsKey(key)) {
 			aaiService.logKeyError(String.format("%s,%s", VNF_ID, GENERIC_VNF_ID));
 		}
-		
+
 		String encoded_vnf = encodeQuery(requestProperties.getProperty(key));
 		request_url = request_url.replace("{vnf-id}", encoded_vnf) ;
 		if(resourceVersion != null) {
@@ -74,31 +74,31 @@ public class GenericVnfRequest extends AAIRequest {
 
 		aaiService.LOGwriteFirstTrace(method, http_req_url.toString());
 		aaiService.LOGwriteDateTrace("vnf-id", requestProperties.getProperty(key));
-		
+
 		return http_req_url;
 	}
-	
+
 	@Override
 	public URL getRequestQueryUrl(String method) throws UnsupportedEncodingException, MalformedURLException {
 
 		String request_url = target_uri+generic_vnf_path;
-		
+
 		String key = VNF_ID;
 		if(requestProperties.containsKey(GENERIC_VNF_ID)) {
 			key = GENERIC_VNF_ID;
 		}
-		
+
 		if(!requestProperties.containsKey(key)) {
 			aaiService.logKeyError(String.format("%s,%s", VNF_ID, GENERIC_VNF_ID));
 		}
-		
+
 		String encoded_vnf = encodeQuery(requestProperties.getProperty(key));
 		request_url = request_url.replace("{vnf-id}", encoded_vnf) ;
 		URL http_req_url =	new URL(request_url);
 
 		aaiService.LOGwriteFirstTrace(method, http_req_url.toString());
 		aaiService.LOGwriteDateTrace("vnf-id", requestProperties.getProperty(key));
-		
+
 		return http_req_url;
 	}
 

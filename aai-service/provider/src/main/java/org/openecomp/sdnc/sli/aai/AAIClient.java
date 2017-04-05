@@ -35,17 +35,7 @@ import org.openecomp.sdnc.sli.aai.update.Update;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v8.AvailabilityZone;
-import org.openecomp.aai.inventory.v8.GenericVnf;
-import org.openecomp.aai.inventory.v8.L3Network;
-import org.openecomp.aai.inventory.v8.PInterface;
-import org.openecomp.aai.inventory.v8.PhysicalLink;
-import org.openecomp.aai.inventory.v8.Pserver;
-import org.openecomp.aai.inventory.v8.SearchResults;
-import org.openecomp.aai.inventory.v8.Service;
-import org.openecomp.aai.inventory.v8.ServiceInstance;
-import org.openecomp.aai.inventory.v8.Tenant;
-import org.openecomp.aai.inventory.v8.Vserver;
+import org.openecomp.aai.inventory.v10.*;
 
 public interface AAIClient extends SvcLogicResource, SvcLogicJavaPlugin {
 

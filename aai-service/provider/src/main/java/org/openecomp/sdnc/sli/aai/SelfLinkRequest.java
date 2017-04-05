@@ -29,6 +29,7 @@ import org.openecomp.sdnc.sli.aai.data.AAIDatum;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Joiner;
 
 public class SelfLinkRequest extends AAIRequest {
 	
@@ -47,6 +48,17 @@ public class SelfLinkRequest extends AAIRequest {
 		String request_url = null;
 		
 		request_url = requestProperties.getProperty(SELFLINK);
+		
+		String query = null;
+		
+		if(request_url.contains("?")) {
+			query = request_url.substring(request_url.indexOf("?"));
+			Joiner.MapJoiner mapJoiner = Joiner.on(",").withKeyValueSeparator("=");
+//			String queryString = mapJoiner.join(query);
+		} else {
+			request_url = request_url + "?depth=1";
+		}
+
 		URL http_req_url =	new URL(request_url);
 
 		aaiService.LOGwriteFirstTrace(method, http_req_url.toString());

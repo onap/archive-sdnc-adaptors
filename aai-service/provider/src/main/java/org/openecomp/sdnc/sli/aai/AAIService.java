@@ -96,7 +96,7 @@ import com.fasterxml.jackson.module.jaxb.JaxbAnnotationIntrospector;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.client.urlconnection.HTTPSProperties;
 
-import org.openecomp.aai.inventory.v8.*;
+import org.openecomp.aai.inventory.v10.*;
 
 
 public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicResource {
@@ -2160,10 +2160,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		Tenant response = null;
 
 		try {
-			AAIRequest request = new TenantRequest();
-			request.addRequestProperty(TenantRequest.TENANT_ID, tenant_id);
-			request.addRequestProperty(CloudRegionRequest.CLOUD_REGION_CLOUD_OWNER, cloudOwner);
-			request.addRequestProperty(CloudRegionRequest.CLOUD_REGION_CLOUD_REGION_ID, cloudRegionId);
+			AAIRequest request = AAIRequest.getRequestFromResource("tenant");
+			request.addRequestProperty("tenant.tenant-id", tenant_id);
+			request.addRequestProperty("cloud-region.cloud-owner", cloudOwner);
+			request.addRequestProperty("cloud-region.cloud-region-id", cloudRegionId);
 
 			String rv = executor.get(request);
 			if(rv != null) {
@@ -2185,10 +2185,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		Tenant response = null;
 
 		try {
-			AAIRequest request = new TenantRequest();
-			request.addRequestProperty(TenantRequest.TENANT_NAME, tenant_name);
-			request.addRequestProperty(CloudRegionRequest.CLOUD_REGION_CLOUD_OWNER, cloudOwner);
-			request.addRequestProperty(CloudRegionRequest.CLOUD_REGION_CLOUD_REGION_ID, cloudRegionId);
+			AAIRequest request = AAIRequest.getRequestFromResource("tenant");
+			request.addRequestProperty("tenant.tenant-name", tenant_name);
+			request.addRequestProperty("cloud-region.cloud-owner", cloudOwner);
+			request.addRequestProperty("cloud-region.cloud-region-id", cloudRegionId);
 			Object rv = executor.query(request, Tenant.class);
 			if(rv == null)
 				return (Tenant)null;
@@ -2210,10 +2210,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		Boolean response = null;
 
 		try {
-			AAIRequest request = new TenantRequest();
-			request.addRequestProperty(TenantRequest.TENANT_ID, tenant_id);
-			request.addRequestProperty(CloudRegionRequest.CLOUD_REGION_CLOUD_OWNER, cloudOwner);
-			request.addRequestProperty(CloudRegionRequest.CLOUD_REGION_CLOUD_REGION_ID, cloudRegionId);
+			AAIRequest request = AAIRequest.getRequestFromResource("tenant");
+			request.addRequestProperty("tenant.tenant-id", tenant_id);
+			request.addRequestProperty("cloud-region.cloud-owner", cloudOwner);
+			request.addRequestProperty("cloud-region.cloud-region-id", cloudRegionId);
 			request.setRequestObject(tenannt);
 			response = executor.post(request);
 		} catch(AAIServiceException aaiexc) {
@@ -2513,7 +2513,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			break;
 
 		default:
-			if(key.contains(String.format("%s.", resource))) {
+			if(!key.contains(String.format("%s.", resource))) {
 				key = rewriteKey(resource, key, ctx);
 			}
 		}
@@ -2558,7 +2558,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			break;
 
 		default:
-			if(key.contains(String.format("%s.", resource))) {
+			if(!key.contains(String.format("%s.", resource))) {
 				key = rewriteKey(resource, key, ctx);
 			}
 		}
@@ -2580,7 +2580,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			break;
 
 		default:
-			if(key.contains(String.format("%s.", resource))) {
+			if(!key.contains(String.format("%s.", resource))) {
 				key = rewriteKey(resource, key, ctx);
 			}
 		}

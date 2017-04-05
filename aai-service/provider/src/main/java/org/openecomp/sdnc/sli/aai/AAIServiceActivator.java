@@ -55,6 +55,8 @@ public class AAIServiceActivator implements BundleActivator {
 	@Override
 	public void start(BundleContext ctx) throws Exception {
 
+		System.setProperty("aaiclient.runtime", "OSGI");
+
 		String sdnConfigDirectory = System.getenv(SDNC_CONFIG_DIR);
 
 		// check SDNC CONFIG DIR system property
@@ -210,8 +212,17 @@ public class AAIServiceActivator implements BundleActivator {
 
 		for(ServiceRegistration registration : localRegistrationSet) {
 			if (registration != null) {
+				try {
+					AAIService aaiService = (AAIService)ctx.getService(registration.getReference());
 				registration.unregister();
 				registrationSet.remove(registration);
+					if(aaiService != null) {
+						aaiService.cleanUp();
+					}
+				} catch(Exception exc) {
+					if(LOG.isDebugEnabled())
+						LOG.debug(exc.getMessage());
+				}
 			}
 		}
 	}

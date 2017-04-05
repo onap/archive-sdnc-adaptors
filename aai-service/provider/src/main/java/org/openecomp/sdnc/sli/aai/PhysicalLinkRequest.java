@@ -30,17 +30,17 @@ import org.openecomp.sdnc.sli.aai.data.AAIDatum;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v8.PhysicalLink;
+import org.openecomp.aai.inventory.v10.PhysicalLink;
 
 public class PhysicalLinkRequest extends AAIRequest {
 
 	// physical link
 	public static final String PHYSICAL_LINK_PATH		= "org.openecomp.sdnc.sli.aai.path.physical.link";
 	public static final String PHYSICAL_LINK_QUERY_PATH	= "org.openecomp.sdnc.sli.aai.path.physical.link.query";
-	
+
 	private final String physical_link_path;
 	private final String physical_link_query_path;
-	
+
 	public static final String LINK_NAME			= "link-name";
 	public static final String PHYSICAL_LINK_NAME	= "physical-link.link-name";
 
@@ -54,12 +54,12 @@ public class PhysicalLinkRequest extends AAIRequest {
 	public URL getRequestQueryUrl(String method) throws UnsupportedEncodingException, MalformedURLException {
 		return this.getRequestUrl(method, null);
 	}
-	
+
 	@Override
 	public URL getRequestUrl(String method, String resourceVersion) throws UnsupportedEncodingException, MalformedURLException {
 
 		String request_url = target_uri+physical_link_path;
-	
+
 		String linkName = null;
 		if(requestProperties.containsKey(LINK_NAME)) {
 			linkName = requestProperties.getProperty(LINK_NAME);
@@ -69,7 +69,7 @@ public class PhysicalLinkRequest extends AAIRequest {
 			linkName = requestProperties.getProperty(PHYSICAL_LINK_NAME);
 		}
 
-		
+
 		String encoded_vnf = encodeQuery(linkName);
 		request_url = request_url.replace("{link-name}", encoded_vnf) ;
 
@@ -80,7 +80,7 @@ public class PhysicalLinkRequest extends AAIRequest {
 
 		aaiService.LOGwriteFirstTrace(method, http_req_url.toString());
 		aaiService.LOGwriteDateTrace("link-name", linkName);
-		
+
 		return http_req_url;
 	}
 

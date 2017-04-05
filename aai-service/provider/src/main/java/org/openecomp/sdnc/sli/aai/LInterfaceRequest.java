@@ -31,17 +31,17 @@ import org.openecomp.sdnc.sli.aai.data.AAIDatum;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v8.LInterface;
+import org.openecomp.aai.inventory.v10.LInterface;
 
 public class LInterfaceRequest extends AAIRequest {
 
 	// tenant (1602)
 	public static final String LAGINTERFACE_LINTERFACE_PATH			= "org.openecomp.sdnc.sli.aai.path.lag.interface.l.interface";
 	public static final String LAGINTERFACE_LINTERFACE_QUERY_PATH	= "org.openecomp.sdnc.sli.aai.path.lag.interface.l.interface.query";
-	
+
 	public static final String P_INTERFACE_LINTERFACE_PATH			= "org.openecomp.sdnc.sli.aai.path.p.interface.l.interface";
 	public static final String P_INTERFACE_LINTERFACE_QUERY_PATH	= "org.openecomp.sdnc.sli.aai.path.p.interface.l.interface.query";
-	
+
 	public static final String LAGINTERFACE_LINTERFACE_PNF_PATH		= "org.openecomp.sdnc.sli.aai.path.lag.interface.l.interface.pnf";
 	public static final String P_INTERFACE_LINTERFACE_PNF_PATH		= "org.openecomp.sdnc.sli.aai.path.p.interface.l.interface.pnf";
 
@@ -49,23 +49,24 @@ public class LInterfaceRequest extends AAIRequest {
 	private final String laginterface_linterface_query_path;
 	private final String p_interface_linterface_path;
 	private final String p_interface_linterface_query_path;
-	
+
 	private final String laginterface_linterface_pnf_path;
 	private final String p_interface_linterface_pnf_path;
-	
+
 	public static final String INTERFACE_NAME = "interface-name";
 	public static final String LINTERFACE_INTERFACE_NAME 	= "l-interface.interface-name";
 	public static final String LAG_INTERFACE_INTERFACE_NAME = "lag-interface.interface-name";
 	public static final String P_INTERFACE_INTERFACE_NAME 	= "p-interface.interface-name";
+	public static final String PNF_PNF_NAME	= "pnf.pnf-name";
 
 	public static final String ROUTER_NAME = "router-name";
 	public static final String HOSTNAME = "hostname";
-	
-	
+
+
 	public static enum TYPE { L2_BRIDGE_BGF, L2_BRIDGE_SBG};
-	
+
 	private final TYPE type;
-	
+
 	public LInterfaceRequest(TYPE type) {
 		this.type = type;
 
@@ -79,23 +80,23 @@ public class LInterfaceRequest extends AAIRequest {
 		p_interface_linterface_pnf_path = configProperties.getProperty(P_INTERFACE_LINTERFACE_PNF_PATH);
 	}
 
-	
+
 	@Override
 	public URL getRequestUrl(String method, String resourceVersion) throws UnsupportedEncodingException, MalformedURLException {
 
-		String request_url = null; 
+		String request_url = null;
 		String encoded_vnf = null;
 		String hostname = null;
 		String pnfname = null;
 		String interfaceName = null;
 
 		if(type == TYPE.L2_BRIDGE_SBG) {
-			if(requestProperties.containsKey(PnfRequest.PNF_PNF_NAME)) {
+			if(requestProperties.containsKey(PNF_PNF_NAME)) {
 				request_url = target_uri + laginterface_linterface_pnf_path;
 			} else {
 				request_url = target_uri + laginterface_linterface_path;
 			}
-			
+
 			if(requestProperties.containsKey(ROUTER_NAME)) {
 				hostname = requestProperties.getProperty(ROUTER_NAME);
 				encoded_vnf = encodeQuery(hostname);
@@ -108,8 +109,8 @@ public class LInterfaceRequest extends AAIRequest {
 				request_url = request_url.replace("{hostname}", encoded_vnf);
 			}
 
-			if(requestProperties.containsKey(PnfRequest.PNF_PNF_NAME)) {
-				pnfname = requestProperties.getProperty(PnfRequest.PNF_PNF_NAME);
+			if(requestProperties.containsKey(PNF_PNF_NAME)) {
+				pnfname = requestProperties.getProperty(PNF_PNF_NAME);
 				encoded_vnf = encodeQuery(pnfname);
 				request_url = request_url.replace("{pnf-name}", encoded_vnf);
 			}
@@ -117,7 +118,7 @@ public class LInterfaceRequest extends AAIRequest {
 			encoded_vnf = encodeQuery(requestProperties.getProperty(LAG_INTERFACE_INTERFACE_NAME));
 			request_url = request_url.replace("{lag-interface.interface-name}", encoded_vnf) ;
 
-			
+
 			interfaceName = requestProperties.getProperty(INTERFACE_NAME);
 			if(interfaceName == null || interfaceName.isEmpty()) {
 				interfaceName = requestProperties.getProperty(LINTERFACE_INTERFACE_NAME);
@@ -127,35 +128,35 @@ public class LInterfaceRequest extends AAIRequest {
 
 		}
 		if(type == TYPE.L2_BRIDGE_BGF) {
-			if(requestProperties.containsKey(PnfRequest.PNF_PNF_NAME)) {
+			if(requestProperties.containsKey(PNF_PNF_NAME)) {
 				request_url = target_uri + p_interface_linterface_pnf_path;
 			} else {
 				request_url = target_uri + p_interface_linterface_path;
 			}
-			
+
 
 			if(requestProperties.containsKey(ROUTER_NAME)) {
 				hostname = requestProperties.getProperty(ROUTER_NAME);
 				encoded_vnf = encodeQuery(hostname);
 				request_url = request_url.replace("{hostname}", encoded_vnf);
-			} 
-			
+			}
+
 			if(requestProperties.containsKey(HOSTNAME)) {
 				hostname = requestProperties.getProperty(HOSTNAME);
 				encoded_vnf = encodeQuery(hostname);
 				request_url = request_url.replace("{hostname}", encoded_vnf);
 			}
-			
-			if(requestProperties.containsKey(PnfRequest.PNF_PNF_NAME)) {
-				pnfname = requestProperties.getProperty(PnfRequest.PNF_PNF_NAME);
+
+			if(requestProperties.containsKey(PNF_PNF_NAME)) {
+				pnfname = requestProperties.getProperty(PNF_PNF_NAME);
 				encoded_vnf = encodeQuery(pnfname);
 				request_url = request_url.replace("{pnf-name}", encoded_vnf);
 			}
-			
+
 			encoded_vnf = encodeQuery(requestProperties.getProperty(P_INTERFACE_INTERFACE_NAME));
 			request_url = request_url.replace("{p-interface.interface-name}", encoded_vnf) ;
-			
-			
+
+
 			interfaceName = requestProperties.getProperty(INTERFACE_NAME);
 			if(interfaceName == null || interfaceName.isEmpty()) {
 				interfaceName = requestProperties.getProperty(LINTERFACE_INTERFACE_NAME);
@@ -185,7 +186,7 @@ public class LInterfaceRequest extends AAIRequest {
 
 		return http_req_url;
 	}
-	
+
 	@Override
 	public URL getRequestQueryUrl(String method) throws UnsupportedEncodingException, MalformedURLException {
 		return this.getRequestUrl(method, null);
@@ -211,27 +212,27 @@ public class LInterfaceRequest extends AAIRequest {
 	public String[] getArgsList() {
 		String[] args = {};
 		if(type == TYPE.L2_BRIDGE_SBG) {
-			String[] tmpArray = {INTERFACE_NAME, LINTERFACE_INTERFACE_NAME, LAG_INTERFACE_INTERFACE_NAME, HOSTNAME, ROUTER_NAME, PnfRequest.PNF_PNF_NAME};
+			String[] tmpArray = {INTERFACE_NAME, LINTERFACE_INTERFACE_NAME, LAG_INTERFACE_INTERFACE_NAME, HOSTNAME, ROUTER_NAME, PNF_PNF_NAME};
 			args = tmpArray;
 		}
 		if(type == TYPE.L2_BRIDGE_BGF) {
-			String[] tmpArray = {INTERFACE_NAME, LINTERFACE_INTERFACE_NAME, P_INTERFACE_INTERFACE_NAME, HOSTNAME, ROUTER_NAME, PnfRequest.PNF_PNF_NAME};
+			String[] tmpArray = {INTERFACE_NAME, LINTERFACE_INTERFACE_NAME, P_INTERFACE_INTERFACE_NAME, HOSTNAME, ROUTER_NAME, PNF_PNF_NAME};
 			args = tmpArray;
 		}
 
 		return args;
 	}
-	
+
 	@Override
 	public Class<? extends AAIDatum> getModelClass() {
 		return LInterface.class;
 	}
-	
+
 	@Override
 	public String getPrimaryResourceName(String resource) {
 		return "l-interface";
 	}
-	
+
 	public static final String processPathData(String request_url, Properties requestProperties) throws UnsupportedEncodingException {
 		String interfaceName = requestProperties.getProperty(INTERFACE_NAME);
 		if(interfaceName == null || interfaceName.isEmpty()) {
