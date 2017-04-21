@@ -33,7 +33,10 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
-import org.openecomp.aai.inventory.v10.*;
+import org.openecomp.aai.inventory.v10.L3Network;
+import org.openecomp.aai.inventory.v10.Pnf;
+import org.openecomp.aai.inventory.v10.LogicalLink;
+import org.openecomp.aai.inventory.v10.ServiceInstance;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Generated("org.jsonschema2pojo")
@@ -58,7 +61,7 @@ public class InstanceFilter {
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
     /**
-     *
+     * 
      * @return
      *     The logicalLink
      */
@@ -68,7 +71,7 @@ public class InstanceFilter {
     }
 
     /**
-     *
+     * 
      * @param logicalLink
      *     The logical-link
      */
@@ -78,7 +81,7 @@ public class InstanceFilter {
     }
 
     /**
-     *
+     * 
      * @return
      *     The pnf
      */
@@ -88,7 +91,7 @@ public class InstanceFilter {
     }
 
     /**
-     *
+     * 
      * @param pnf
      *     The pnf
      */

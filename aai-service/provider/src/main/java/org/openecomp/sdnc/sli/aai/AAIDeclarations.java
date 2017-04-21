@@ -275,8 +275,8 @@ public abstract class AAIDeclarations implements AAIClient {
 					}
 
 					tenantId = getTenantIdFromVserverUrl(vserverUrl);
-					String cloudOwner = nameValues.get("cloud_region.cloud_owner");
-					String cloudRegionId = nameValues.get("cloud_region.cloud_region_id");
+							String cloudOwner = getCloudOwnerFromVserverUrl(vserverUrl);
+							String cloudRegionId = getCloudRegionFromVserverUrl(vserverUrl);
 
 					Vserver vserver = null;
 					try {
@@ -306,10 +306,7 @@ public abstract class AAIDeclarations implements AAIClient {
 						attributes.put("cloud-region-id", cloudRegionId);
 					}
 				} else if (vserverId != null && tenantId != null) {
-					String cloudOwner = nameValues.get("cloud_region.cloud_owner");
-					String cloudRegionId = nameValues.get("cloud_region.cloud_region_id");
-
-						Vserver vserver = this.requestVServerData(tenantId, vserverId, cloudOwner, cloudRegionId);
+						Vserver vserver = this.requestVServerData(tenantId, vserverId, "att-aic", "AAIAIC25");
 						if(vserver == null) {
 							return QueryStatus.NOT_FOUND;
 						}

@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,9 @@
 
 package org.openecomp.sdnc.ra;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,11 +45,13 @@ import org.openecomp.sdnc.ra.service.dao.ServiceResourceDao;
 import org.openecomp.sdnc.ra.service.data.ServiceResource;
 import org.openecomp.sdnc.ra.service.data.ServiceStatus;
 import org.openecomp.sdnc.rm.comp.ResourceManager;
+import org.openecomp.sdnc.rm.data.AllocationAction;
 import org.openecomp.sdnc.rm.data.AllocationItem;
 import org.openecomp.sdnc.rm.data.AllocationOutcome;
 import org.openecomp.sdnc.rm.data.AllocationRequest;
 import org.openecomp.sdnc.rm.data.AllocationStatus;
 import org.openecomp.sdnc.rm.data.LimitAllocationOutcome;
+import org.openecomp.sdnc.rm.data.LimitAllocationRequest;
 import org.openecomp.sdnc.rm.data.LimitResource;
 import org.openecomp.sdnc.rm.data.MultiResourceAllocationOutcome;
 import org.openecomp.sdnc.rm.data.RangeAllocationItem;
@@ -128,8 +133,8 @@ public class ResourceAllocator implements SvcLogicResource {
 	        throws SvcLogicException {
 		String serviceModel = ctx.getAttribute("tmp.resource-allocator.service-model");
 		if (serviceModel != null && serviceModel.trim().length() > 0)
-			return allocateResources(serviceModel, ctx, true);
-		return allocateResourcesL3SDN(ctx, true);
+			return allocateResources(serviceModel, ctx, true, prefix);
+		return allocateResourcesL3SDN(ctx, true, prefix);
 	}
 
 	@Override
@@ -141,8 +146,28 @@ public class ResourceAllocator implements SvcLogicResource {
 	        String prefix,
 	        String orderBy,
 	        SvcLogicContext ctx) throws SvcLogicException {
-		log.debug("key: " + key);
-		log.debug("prefix: " + prefix);
+
+		prefix = prefix == null ? "" : prefix + '.';
+
+		if (!resource.equals("NetworkCapacity")) {
+			log.info("resource: " + resource);
+			log.info("key: " + key);
+
+			Resource r = resourceManager.getResource(resource, key);
+			if (r == null)
+				return QueryStatus.NOT_FOUND;
+
+			if (r instanceof LimitResource) {
+				ctx.setAttribute(prefix + "used", String.valueOf(((LimitResource) r).used));
+
+				log.info("Added context attr: " + prefix + "used: " + String.valueOf(((LimitResource) r).used));
+			}
+
+			return QueryStatus.SUCCESS;
+		}
+
+		log.info("key: " + key);
+		log.info("prefix: " + prefix);
 
 		if (key == null)
 			return QueryStatus.SUCCESS;
@@ -151,8 +176,6 @@ public class ResourceAllocator implements SvcLogicResource {
 			key = key.substring(1, key.length() - 1);
 
 		String endPointPosition = "VPE-Cust";
-
-		prefix = prefix == null ? "" : prefix + '.';
 
 		String resourceUnionId = key + '/' + endPointPosition;
 		List<Resource> rlist = resourceManager.getResourceUnion(resourceUnionId);
@@ -211,8 +234,8 @@ public class ResourceAllocator implements SvcLogicResource {
 	        throws SvcLogicException {
 		String serviceModel = ctx.getAttribute("tmp.resource-allocator.service-model");
 		if (serviceModel != null && serviceModel.trim().length() > 0)
-			return allocateResources(serviceModel, ctx, false);
-		return allocateResourcesL3SDN(ctx, false);
+			return allocateResources(serviceModel, ctx, false, prefix);
+		return allocateResourcesL3SDN(ctx, false, prefix);
 	}
 
 	@Override
@@ -289,7 +312,10 @@ public class ResourceAllocator implements SvcLogicResource {
 		return QueryStatus.SUCCESS;
 	}
 
-	private QueryStatus allocateResourcesL3SDN(SvcLogicContext ctx, boolean checkOnly) throws SvcLogicException {
+	private QueryStatus allocateResourcesL3SDN(SvcLogicContext ctx, boolean checkOnly, String prefix)
+	        throws SvcLogicException {
+		prefix = prefix == null ? "" : prefix + '.';
+
 		String aicSiteId = getAicSiteId(ctx);
 		Map<String, Object> service = getServiceData(ctx);
 
@@ -335,6 +361,8 @@ public class ResourceAllocator implements SvcLogicResource {
 		List<Map<String, Object>> vplspePortData = vplspePortDao.getVplspePortData(aicSiteId);
 		List<Map<String, Object>> serverData = serverDao.getServerData(aicSiteId);
 
+		vpePortData = orderVpe(vpePortData);
+
 		long maxAvailableSpeedVpePort = 0;
 		boolean vpePortFound = false;
 
@@ -376,6 +404,55 @@ public class ResourceAllocator implements SvcLogicResource {
 			AllocationOutcome ao = resourceManager.allocateResources(ar);
 
 			if (ao.status == AllocationStatus.Success) {
+
+				// Assign affinity link
+				if (!checkOnly) {
+					List<String> affinityLinkIdList = new ArrayList<>();
+					affinityLinkIdList.add("0");
+					affinityLinkIdList.add("1");
+					affinityLinkIdList.add("2");
+					affinityLinkIdList.add("3");
+
+					String preferedAffinityLinkId = "0";
+					long lowestAssignedBw = Long.MAX_VALUE;
+					for (String affinityLinkId : affinityLinkIdList) {
+						long used = 0;
+						String assetId = ed.equipmentId + "-" + affinityLinkId;
+						Resource r = resourceManager.getResource("Bandwidth", assetId);
+						if (r != null) {
+							LimitResource ll = (LimitResource) r;
+							used = ll.used;
+						}
+						if (used < lowestAssignedBw) {
+							lowestAssignedBw = used;
+							preferedAffinityLinkId = affinityLinkId;
+						}
+						log.info("Assigned bandwidth on affinity link: " + assetId + ": " + used);
+					}
+
+					log.info("Prefered affinity link for " + ed.equipmentId + ": " + preferedAffinityLinkId);
+
+					ctx.setAttribute(prefix + "affinity-link", preferedAffinityLinkId);
+
+					LimitAllocationRequest ar1 = new LimitAllocationRequest();
+					ar1.resourceSetId = sd.resourceSetId;
+					ar1.resourceUnionId = sd.resourceUnionId;
+					ar1.resourceShareGroupList = null;
+					ar1.resourceName = "Bandwidth";
+					ar1.assetId = ed.equipmentId + "-" + preferedAffinityLinkId;
+					ar1.missingResourceAction = AllocationAction.Succeed_Allocate;
+					ar1.expiredResourceAction = AllocationAction.Succeed_Allocate;
+					ar1.replace = true;
+					ar1.strict = false;
+					ar1.checkLimit = Long.MAX_VALUE;
+					ar1.checkCount = 0;
+					ar1.allocateCount = (Long) sd.data.get("service-speed-kbps");
+
+					resourceManager.allocateResources(ar1);
+				}
+
+				ctx.setAttribute(prefix + "vpe-name", vpeId);
+
 				vpePortFound = true;
 				break;
 			}
@@ -529,7 +606,7 @@ public class ResourceAllocator implements SvcLogicResource {
 		}
 
 		if (vpePortFound && vplspePortFound && serverFound) {
-			if (!checkOnly)
+			if (!checkOnly) {
 				if (pendingServiceResource == null) {
 					log.info("Adding the pending service resource record to DB.");
 					serviceResourceDao.addServiceResource(sr);
@@ -542,6 +619,7 @@ public class ResourceAllocator implements SvcLogicResource {
 					        sr.serviceChangeNumber);
 					serviceResourceDao.updateServiceResource(sr);
 				}
+			}
 
 			return QueryStatus.SUCCESS;
 		}
@@ -559,6 +637,39 @@ public class ResourceAllocator implements SvcLogicResource {
 
 		setOutputContext(ctx, maxAvailableSpeed, "kbps");
 		return QueryStatus.NOT_FOUND;
+	}
+
+	private List<Map<String, Object>> orderVpe(List<Map<String, Object>> vpePortData) {
+		for (Map<String, Object> vpe : vpePortData) {
+			String vpeId = String.valueOf(vpe.get("vpe-id"));
+			String interfaceName = String.valueOf(vpe.get("physical-interface-name"));
+			String portId = vpeId + "/" + interfaceName;
+			Resource r = resourceManager.getResource("Bandwidth", portId);
+			long used = 0;
+			if (r != null) {
+				LimitResource ll = (LimitResource) r;
+				used = ll.used;
+			}
+			vpe.put("used-bandwidth", used);
+
+			log.info("Used bandwidth on VPE: " + vpeId + ": " + used);
+		}
+
+		Collections.sort(vpePortData, new Comparator<Map<String, Object>>() {
+
+			@Override
+			public int compare(Map<String, Object> o1, Map<String, Object> o2) {
+				long used1 = (Long) o1.get("used-bandwidth");
+				long used2 = (Long) o2.get("used-bandwidth");
+				if (used1 < used2)
+					return -1;
+				if (used1 > used2)
+					return 1;
+				return 0;
+			}
+		});
+
+		return vpePortData;
 	}
 
 	private void setThresholdData(SvcLogicContext ctx, ThresholdStatus th, ServiceData sd, EquipmentData ed) {
@@ -584,8 +695,10 @@ public class ResourceAllocator implements SvcLogicResource {
 			ctx.setAttribute(pp + "equipment-data." + edKey, String.valueOf(ed.data.get(edKey)));
 	}
 
-	private QueryStatus allocateResources(String serviceModel, SvcLogicContext ctx, boolean checkOnly)
+	private QueryStatus allocateResources(String serviceModel, SvcLogicContext ctx, boolean checkOnly, String prefix)
 	        throws SvcLogicException {
+		prefix = prefix == null ? "" : prefix + '.';
+
 		Map<String, Object> service = getServiceData(ctx);
 		Map<String, Object> ec = getEquipConstraints(ctx);
 
@@ -624,6 +737,9 @@ public class ResourceAllocator implements SvcLogicResource {
 		ServiceData sd = new ServiceData();
 		sd.data = service;
 		sd.serviceModel = serviceModel;
+		sd.endPointPosition = (String) service.get("end-point-position");
+		sd.resourceShareGroup = (String) service.get("resource-share-group");
+		sd.resourceName = (String) service.get("resource-name");
 		sd.serviceInstanceId = serviceInstanceId;
 
 		StrUtil.info(log, sd);
@@ -635,6 +751,7 @@ public class ResourceAllocator implements SvcLogicResource {
 			if (!checkOnly) {
 				EndPointData ep = epList.get(0);
 
+				if (sd.resourceName == null) {
 				ServiceResource sr = new ServiceResource();
 				sr.serviceInstanceId = serviceInstanceId;
 				sr.serviceStatus = ServiceStatus.Pending;
@@ -657,6 +774,16 @@ public class ResourceAllocator implements SvcLogicResource {
 					        sr.serviceChangeNumber);
 					serviceResourceDao.updateServiceResource(sr);
 				}
+			}
+
+				for (EndPointData ep1 : epList)
+					if (ep1.data != null && !ep1.data.isEmpty())
+						for (String key : ep1.data.keySet()) {
+							String value = String.valueOf(ep1.data.get(key));
+							ctx.setAttribute(prefix + key, value);
+
+							log.info("Added context attr: " + prefix + key + ": " + value);
+						}
 			}
 
 			return QueryStatus.SUCCESS;
@@ -682,13 +809,27 @@ public class ResourceAllocator implements SvcLogicResource {
 	}
 
 	private Map<String, Object> getServiceData(SvcLogicContext ctx) throws SvcLogicException {
+		Map<String, Object> sd = new HashMap<String, Object>();
+
+		String endPointPosition = ctx.getAttribute("tmp.resource-allocator.end-point-position");
+		if (endPointPosition != null && endPointPosition.trim().length() > 0)
+			sd.put("end-point-position", endPointPosition.trim());
+
+		String resourceName = ctx.getAttribute("tmp.resource-allocator.resource-name");
+		if (resourceName != null && resourceName.trim().length() > 0)
+			sd.put("resource-name", resourceName.trim());
+
+		String resourceShareGroup = ctx.getAttribute("tmp.resource-allocator.resource-share-group");
+		if (resourceShareGroup != null && resourceShareGroup.trim().length() > 0)
+			sd.put("resource-share-group", resourceShareGroup.trim());
+
 		String serviceInstanceId = ctx.getAttribute("tmp.resource-allocator.service-instance-id");
 		if (serviceInstanceId == null)
 			serviceInstanceId = "checkServiceInstance";
+		sd.put("service-instance-id", serviceInstanceId);
 
 		String speedStr = ctx.getAttribute("tmp.resource-allocator.speed");
-		if (speedStr == null || speedStr.trim().length() == 0)
-			throw new SvcLogicException("tmp.resource-allocator.speed is required in ResourceAllocator");
+		if (speedStr != null && speedStr.trim().length() > 0) {
 		long speed = 0;
 		try {
 			speed = Long.parseLong(speedStr);
@@ -700,9 +841,8 @@ public class ResourceAllocator implements SvcLogicResource {
 			throw new SvcLogicException("tmp.resource-allocator.speed-unit is required in ResourceAllocator");
 		long serviceSpeedKbps = speedUtil.convertToKbps(speed, unit);
 
-		Map<String, Object> sd = new HashMap<String, Object>();
-		sd.put("service-instance-id", serviceInstanceId);
 		sd.put("service-speed-kbps", serviceSpeedKbps);
+		}
 
 		String vpnId = ctx.getAttribute("tmp.resource-allocator.vpn-id");
 		if (vpnId != null && vpnId.trim().length() > 0)
@@ -749,15 +889,62 @@ public class ResourceAllocator implements SvcLogicResource {
 		String clli = ctx.getAttribute("tmp.resource-allocator.clli");
 		if (clli == null || clli.trim().length() == 0)
 			clli = ctx.getAttribute("tmp.resource-allocator.aic-site-id");
+		if (clli != null) {
 		mm.put("clli", clli.trim());
+			mm.put("aic-site-id", clli.trim());
+		}
 
 		String vpeName = ctx.getAttribute("tmp.resource-allocator.vpe-name");
 		if (vpeName != null && vpeName.trim().length() > 0)
 			mm.put("vpe-name", vpeName.trim());
 
+		String vnfName = ctx.getAttribute("tmp.resource-allocator.device-name");
+		if (vnfName != null && vnfName.trim().length() > 0)
+			mm.put("vnf-name", vnfName.trim());
+
 		String excludeVpeList = ctx.getAttribute("tmp.resource-allocator.exclude-vpe-list");
 		if (excludeVpeList != null && excludeVpeList.trim().length() > 0)
 			mm.put("exclude-vpe-list", excludeVpeList.trim());
+
+		String uplinkCircuitCountStr =
+		        ctx.getAttribute("tmp.resource-allocator.uplink-circuit-list.uplink-circuit_length");
+		if (uplinkCircuitCountStr != null) {
+			long uplinkCircuitCount = 0;
+			try {
+				uplinkCircuitCount = Long.parseLong(uplinkCircuitCountStr);
+			} catch (NumberFormatException e) {
+				throw new SvcLogicException(
+				        "Invalid tmp.resource-allocator.uplink-circuit-list.uplink-circuit_length. Must be a number.");
+			}
+			List<Map<String, Object>> uplinkCircuitList = new ArrayList<>();
+			for (int i = 0; i < uplinkCircuitCount; i++) {
+				String uplinkCircuitId = ctx.getAttribute(
+				        "tmp.resource-allocator.uplink-circuit-list.uplink-circuit[" + i + "].uplink-circuit-id");
+				String uplinkCircuitBandwidthStr =
+				        ctx.getAttribute("tmp.resource-allocator.uplink-circuit-list.uplink-circuit[" + i +
+				                "].uplink-circuit-bandwidth");
+				String uplinkCircuitBandwidthUnit =
+				        ctx.getAttribute("tmp.resource-allocator.uplink-circuit-list.uplink-circuit[" + i +
+				                "].uplink-circuit-bandwidth-unit");
+
+				long uplinkCircuitBandwidth = 0;
+				try {
+					uplinkCircuitBandwidth = Long.parseLong(uplinkCircuitBandwidthStr);
+				} catch (NumberFormatException e) {
+					throw new SvcLogicException("Invalid tmp.resource-allocator.uplink-circuit-list.uplink-circuit[" +
+					        i + "].uplink-circuit-id. Must be a number.");
+				}
+
+				long uplinkCircuitBandwidthKbps =
+				        speedUtil.convertToKbps(uplinkCircuitBandwidth, uplinkCircuitBandwidthUnit);
+
+				Map<String, Object> uplinkCircuit = new HashMap<String, Object>();
+				uplinkCircuit.put("uplink-circuit-id", uplinkCircuitId);
+				uplinkCircuit.put("uplink-circuit-bandwidth", uplinkCircuitBandwidthKbps);
+				uplinkCircuitList.add(uplinkCircuit);
+			}
+			mm.put("uplink-circuit-list", uplinkCircuitList);
+		}
 
 		return mm;
 	}

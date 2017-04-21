@@ -106,6 +106,18 @@
 			<artifactId>jaxb2-basics-runtime</artifactId>
 			<version>0.6.4</version>
 		</dependency>
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.8.3</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-core</artifactId>
+			<version>4.3.5.RELEASE</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -119,7 +131,7 @@
 					<instructions>
 						<Bundle-SymbolicName>org.openecomp.sdnc.sli.aai</Bundle-SymbolicName>
 						<Bundle-Activator>org.openecomp.sdnc.sli.aai.AAIServiceActivator</Bundle-Activator>
-						<Export-Package>org.openecomp.sdnc.sli.aai.*,inventory.aai.sdnc.openecomp.org.*</Export-Package>
+						<Export-Package>org.openecomp.sdnc.sli.aai.*,org.openecomp.aai.inventory.v10.*</Export-Package>
                         <Import-Package>org.openecomp.sdnc.sli.*,org.osgi.framework.*,org.slf4j.*,org.apache.commons.lang3.*,javax.xml.bind.annotation.*,javax.ws.rs.*,javax.ws.rs.core.*,com.fasterxml.jackson.module.jaxb.*,com.sun.jersey.client.urlconnection.*,com.sun.jersey.api.client.config.*,com.fasterxml.jackson.databind.type.*,com.fasterxml.jackson.module.jaxb.*,com.fasterxml.jackson.databind.introspect.*,com.fasterxml.jackson.annotation.*,com.fasterxml.jackson.databind.*</Import-Package>
 						<Import-Package>*</Import-Package>
 						<Embed-Transitive>true</Embed-Transitive>
@@ -141,9 +153,9 @@
 					</execution>
 				</executions>
 				<configuration>
-					<schemaDirectory>${project.basedir}/src/main/resources</schemaDirectory>
+				<schemaDirectory>${project.basedir}/src/main/resources</schemaDirectory>
 					<schemaIncludes>
-						<value>aai_schema_v8.xsd</value>
+						<value>aai_schema_v10.xsd</value>
 					</schemaIncludes>
 					<bindingIncludes>
 						<include>aai-schema-bindings.xjb</include>

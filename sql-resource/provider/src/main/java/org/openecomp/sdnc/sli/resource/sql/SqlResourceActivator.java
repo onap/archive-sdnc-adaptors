@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,10 @@
 
 package org.openecomp.sdnc.sli.resource.sql;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.Properties;
+
 import org.openecomp.sdnc.sli.SvcLogicResource;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
@@ -30,7 +34,7 @@ import org.slf4j.LoggerFactory;
 
 public class SqlResourceActivator implements BundleActivator {
 
-	private static final String SVCLOGIC_PROP_PATH = "/svclogic.properties";
+	private static final String SQLRESOURCE_PROP_PATH = "/sql-resource.properties";
 
 	private ServiceRegistration registration = null;
 
@@ -40,7 +44,32 @@ public class SqlResourceActivator implements BundleActivator {
 	@Override
 	public void start(BundleContext ctx) throws Exception {
 
+		String cfgDir = System.getenv("SDNC_CONFIG_DIR");
 
+		if ((cfgDir == null) || (cfgDir.length() == 0)) {
+			cfgDir = "/opt/sdnc/data/properties";
+			LOG.warn("SDNC_CONFIG_DIR unset - defaulting to "+cfgDir);
+		}
+
+		String cryptKey = "";
+
+		File sqlResourcePropFile = new File(cfgDir+SQLRESOURCE_PROP_PATH);
+		Properties sqlResourceProps = new Properties();
+		if (sqlResourcePropFile.exists()) {
+			try {
+
+				sqlResourceProps.load(new FileInputStream(sqlResourcePropFile));
+
+				cryptKey = sqlResourceProps.getProperty("org.openecomp.sdnc.resource.sql.cryptkey");
+			} catch (Exception e) {
+				LOG.warn(
+						"Could not load properties file " + sqlResourcePropFile.getAbsolutePath(), e);
+			}
+		} else {
+			LOG.warn("Cannot read "+sqlResourcePropFile.getAbsolutePath()+" to find encryption key - using default");
+		}
+
+		SqlResource.setCryptKey(cryptKey);
 
 		// Advertise Sql resource adaptor
 		SvcLogicResource impl = new SqlResource();

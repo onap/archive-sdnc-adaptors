@@ -37,10 +37,10 @@ public class RelationshipRequest extends AAIRequest {
 	// tenant (1602)
 	public static final String RELATIONSHIP_LIST_PATH		= "org.openecomp.sdnc.sli.aai.path.relationship.list";
 	public static final String RELATIONSHIP_LIST_QUERY_PATH	= "org.openecomp.sdnc.sli.aai.path.relationship.list.query";
-
+	
 	private final String relationship_path;
 	private final String relationship_query_path;
-
+	
 	public static final String RELATED_TO = "related-to";
 	public static final String RELATIONSHIP_KEY = "relationship-key";
 
@@ -49,23 +49,23 @@ public class RelationshipRequest extends AAIRequest {
 		relationship_query_path = configProperties.getProperty(RELATIONSHIP_LIST_QUERY_PATH);
 	}
 
-
+	
 	@Override
 	public URL getRequestUrl(String method, String resourceVersion) throws UnsupportedEncodingException, MalformedURLException {
 
 		AAIRequest masterRequest = (AAIRequest)requestProperties.get(MASTER_REQUEST);
 		URL masterURL = masterRequest.getRequestUrl(method, null);
-
+		
 		String request_url = masterURL.toString();
 		request_url = request_url + relationship_path;
-
+		
 		if(request_url.contains("//")) {
 			request_url = request_url.replaceAll("//", "/");
 		}
 
 		if(requestProperties.containsKey(RELATED_TO)) {
 			String encoded_vnf = encodeQuery(requestProperties.getProperty(RELATED_TO));
-			request_url = request_url.replace("{related-to}", encoded_vnf) ;
+			request_url = request_url.replace("{related-to}", encoded_vnf) ;			
 		}
 
 //		if(resourceVersion != null) {
@@ -75,10 +75,10 @@ public class RelationshipRequest extends AAIRequest {
 
 		aaiService.LOGwriteFirstTrace(method, http_req_url.toString());
 		aaiService.LOGwriteDateTrace("related-to", requestProperties.getProperty(RELATED_TO));
-
+		
 		return http_req_url;
 	}
-
+	
 	@Override
 	public URL getRequestQueryUrl(String method) throws UnsupportedEncodingException, MalformedURLException {
 
@@ -89,7 +89,7 @@ public class RelationshipRequest extends AAIRequest {
 
 		aaiService.LOGwriteFirstTrace(method, http_req_url.toString());
 		aaiService.LOGwriteDateTrace("tenant_name", requestProperties.getProperty(RELATIONSHIP_KEY));
-
+		
 		return http_req_url;
 	}
 
@@ -120,7 +120,7 @@ public class RelationshipRequest extends AAIRequest {
 	public Class<? extends AAIDatum> getModelClass() {
 		return RelationshipList.class;
 	}
-
+	
 	public boolean isDeleteDataRequired() {
 		return true;
 	}

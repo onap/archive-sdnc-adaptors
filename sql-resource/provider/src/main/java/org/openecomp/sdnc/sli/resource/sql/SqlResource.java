@@ -3,14 +3,14 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,16 +21,22 @@
 
 package org.openecomp.sdnc.sli.resource.sql;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.sql.rowset.CachedRowSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openecomp.sdnc.sli.SvcLogicContext;
 import org.openecomp.sdnc.sli.SvcLogicException;
+import org.openecomp.sdnc.sli.SvcLogicJavaPlugin;
 import org.openecomp.sdnc.sli.SvcLogicResource;
-import org.openecomp.sdnc.sli.SvcLogicResource.QueryStatus;
 import org.openecomp.sdnc.sli.resource.dblib.DBResourceManager;
 import org.openecomp.sdnc.sli.resource.dblib.DbLibService;
 import org.osgi.framework.Bundle;
@@ -40,33 +46,29 @@ import org.osgi.framework.ServiceReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SqlResource implements SvcLogicResource {
+public class SqlResource implements SvcLogicResource, SvcLogicJavaPlugin {
 
-	private static final Logger LOG = LoggerFactory
-			.getLogger(SqlResource.class);
+	private static final Logger LOG = LoggerFactory.getLogger(SqlResource.class);
 
-	private static final String DBLIB_SERVICE =
-	"org.openecomp.sdnc.sli.resource.dblib.DBResourceManager";
-
+	private static final String DBLIB_SERVICE = "org.openecomp.sdnc.sli.resource.dblib.DBResourceManager";
 
 	private static String CRYPT_KEY = "";
 
 	public SqlResource() {
 	}
 
-
 	// For sql-resource, is-available is the same as exists
 	@Override
-	public QueryStatus isAvailable(String resource, String key, String prefix,
-			SvcLogicContext ctx) throws SvcLogicException {
+	public QueryStatus isAvailable(String resource, String key, String prefix, SvcLogicContext ctx)
+			throws SvcLogicException {
 
-		return(exists(resource, key, prefix, ctx));
+		return (exists(resource, key, prefix, ctx));
 
 	}
 
 	@Override
-	public QueryStatus exists(String resource, String key, String prefix,
-			SvcLogicContext ctx) throws SvcLogicException {
+	public QueryStatus exists(String resource, String key, String prefix, SvcLogicContext ctx)
+			throws SvcLogicException {
 
 		DbLibService dblibSvc = getDbLibService();
 		if (dblibSvc == null) {
@@ -95,9 +97,9 @@ public class SqlResource implements SvcLogicResource {
 		}
 	}
 
-//	@Override
-	public QueryStatus query(String resource, boolean localOnly, String select, String key,  String prefix, String orderBy, SvcLogicContext ctx) throws SvcLogicException {
-
+	// @Override
+	public QueryStatus query(String resource, boolean localOnly, String select, String key, String prefix,
+			String orderBy, SvcLogicContext ctx) throws SvcLogicException {
 
 		DbLibService dblibSvc = getDbLibService();
 
@@ -117,100 +119,84 @@ public class SqlResource implements SvcLogicResource {
 				retval = QueryStatus.NOT_FOUND;
 				LOG.debug("No data found");
 			} else {
-				if (ctx != null) {
-
-
-					if ((prefix != null) && prefix.endsWith("[]")) {
-						// Return an array.
-						String pfx = prefix.substring(0, prefix.length()-2);
-						int idx = 0;
-						do {
-							ResultSetMetaData rsMeta = results.getMetaData();
-							int numCols = rsMeta.getColumnCount();
-
-							for (int i = 0; i < numCols; i++) {
-								String colValue = null;
-								String tableName = rsMeta.getTableName(i+1);
-								if (rsMeta.getColumnType(i+1) == java.sql.Types.VARBINARY) {
-									colValue = decryptColumn(tableName, rsMeta.getColumnName(i+1), results.getBytes(i+1), dblibSvc);
-								} else {
-									colValue = results.getString(i+1);
-								}
-								LOG.debug("Setting " + pfx
-										+ "[" + idx + "]."
-										+ rsMeta.getColumnLabel(i + 1)
-												.replaceAll("_", "-") + " = " +
-										colValue);
-								ctx.setAttribute(pfx
-										+ "[" + idx + "]."
-										+ rsMeta.getColumnLabel(i + 1)
-												.replaceAll("_", "-"),
-										colValue);
-							}
-							idx++;
-						} while (results.next());
-						LOG.debug("Setting "+ pfx + "_length = "+idx);
-						ctx.setAttribute(pfx + "_length", ""+idx);
-					} else {
-						ResultSetMetaData rsMeta = results.getMetaData();
-						int numCols = rsMeta.getColumnCount();
-
-						for (int i = 0; i < numCols; i++) {
-							String colValue =results.getString(i+1);
-
-							if (prefix != null) {
-
-								LOG.debug("Setting "+prefix
-										+ "."
-										+ rsMeta.getColumnLabel(i + 1)
-												.replaceAll("_", "-")+" = "+
-										colValue);
-								ctx.setAttribute(prefix
-										+ "."
-										+ rsMeta.getColumnLabel(i + 1)
-												.replaceAll("_", "-"),
-										colValue);
-							} else {
-
-								LOG.debug("Setting "+rsMeta.getColumnLabel(i + 1)
-										.replaceAll("_", "-")+" = "+colValue);
-
-								ctx.setAttribute(rsMeta.getColumnLabel(i + 1)
-										.replaceAll("_", "-"), colValue);
-							}
-						}
-					}
-				}
+				saveCachedRowSetToCtx(results, ctx, prefix, dblibSvc);
 			}
-
 			return (retval);
-
 		} catch (Exception e) {
 			LOG.error("Caught SQL exception", e);
 			return (QueryStatus.FAILURE);
 		}
+	}
 
+	public void saveCachedRowSetToCtx(CachedRowSet results, SvcLogicContext ctx, String prefix, DbLibService dblibSvc)
+			throws SQLException {
+		if (ctx != null) {
+			if ((prefix != null) && prefix.endsWith("[]")) {
+				// Return an array.
+				String pfx = prefix.substring(0, prefix.length() - 2);
+				int idx = 0;
+				do {
+					ResultSetMetaData rsMeta = results.getMetaData();
+					int numCols = rsMeta.getColumnCount();
+
+					for (int i = 0; i < numCols; i++) {
+						String colValue = null;
+						String tableName = rsMeta.getTableName(i + 1);
+						if (rsMeta.getColumnType(i + 1) == java.sql.Types.VARBINARY) {
+							colValue = decryptColumn(tableName, rsMeta.getColumnName(i + 1), results.getBytes(i + 1),
+									dblibSvc);
+						} else {
+							colValue = results.getString(i + 1);
+						}
+						LOG.debug("Setting " + pfx + "[" + idx + "]."
+								+ rsMeta.getColumnLabel(i + 1).replaceAll("_", "-") + " = " + colValue);
+						ctx.setAttribute(pfx + "[" + idx + "]." + rsMeta.getColumnLabel(i + 1).replaceAll("_", "-"),
+								colValue);
+					}
+					idx++;
+				} while (results.next());
+				LOG.debug("Setting " + pfx + "_length = " + idx);
+				ctx.setAttribute(pfx + "_length", "" + idx);
+			} else {
+				ResultSetMetaData rsMeta = results.getMetaData();
+				int numCols = rsMeta.getColumnCount();
+
+				for (int i = 0; i < numCols; i++) {
+					String colValue = null;
+					String tableName = rsMeta.getTableName(i + 1);
+					if ("VARBINARY".equalsIgnoreCase(rsMeta.getColumnTypeName(i + 1))) {
+						colValue = decryptColumn(tableName, rsMeta.getColumnName(i + 1), results.getBytes(i + 1),
+								dblibSvc);
+					} else {
+						colValue = results.getString(i + 1);
+					}
+					if (prefix != null) {
+						LOG.debug("Setting " + prefix + "." + rsMeta.getColumnLabel(i + 1).replaceAll("_", "-") + " = "
+								+ colValue);
+						ctx.setAttribute(prefix + "." + rsMeta.getColumnLabel(i + 1).replaceAll("_", "-"), colValue);
+					} else {
+						LOG.debug("Setting " + rsMeta.getColumnLabel(i + 1).replaceAll("_", "-") + " = " + colValue);
+						ctx.setAttribute(rsMeta.getColumnLabel(i + 1).replaceAll("_", "-"), colValue);
+					}
+				}
+			}
+		}
 	}
 
 	// reserve is no-op
 	@Override
-	public QueryStatus reserve(String resource, String select, String key,
-			String prefix, SvcLogicContext ctx) throws SvcLogicException {
-
-		return(QueryStatus.SUCCESS);
-
+	public QueryStatus reserve(String resource, String select, String key, String prefix, SvcLogicContext ctx)
+			throws SvcLogicException {
+		return (QueryStatus.SUCCESS);
 	}
 
 	// release is no-op
 	@Override
-	public QueryStatus release(String resource, String key, SvcLogicContext ctx)
-			throws SvcLogicException {
-
-		return(QueryStatus.SUCCESS);
+	public QueryStatus release(String resource, String key, SvcLogicContext ctx) throws SvcLogicException {
+		return (QueryStatus.SUCCESS);
 	}
 
-	private QueryStatus executeSqlWrite(String key, SvcLogicContext ctx)
-			throws SvcLogicException {
+	private QueryStatus executeSqlWrite(String key, SvcLogicContext ctx) throws SvcLogicException {
 		QueryStatus retval = QueryStatus.SUCCESS;
 
 		DbLibService dblibSvc = getDbLibService();
@@ -221,7 +207,7 @@ public class SqlResource implements SvcLogicResource {
 
 		String sqlStmt = resolveCtxVars(key, ctx);
 
-		LOG.debug("key = ["+key+"]; sqlStmt = ["+sqlStmt+"]");
+		LOG.debug("key = [" + key + "]; sqlStmt = [" + sqlStmt + "]");
 		try {
 
 			if (!dblibSvc.writeData(sqlStmt, null, null)) {
@@ -232,21 +218,17 @@ public class SqlResource implements SvcLogicResource {
 			retval = QueryStatus.FAILURE;
 		}
 
-
-
 		return (retval);
 
 	}
 
-	private String resolveCtxVars(String key,
-			SvcLogicContext ctx) {
+	private String resolveCtxVars(String key, SvcLogicContext ctx) {
 		if (key == null) {
 			return (null);
 		}
 
 		if (key.startsWith("'") && key.endsWith("'")) {
 			key = key.substring(1, key.length() - 1);
-
 			LOG.debug("Stripped outer single quotes - key is now [" + key + "]");
 		}
 
@@ -254,29 +236,30 @@ public class SqlResource implements SvcLogicResource {
 
 		StringBuffer sqlBuffer = new StringBuffer();
 
-
 		for (int i = 0; i < keyTerms.length; i++) {
 			sqlBuffer.append(resolveTerm(keyTerms[i], ctx));
 			sqlBuffer.append(" ");
 		}
 
-
 		return (sqlBuffer.toString());
 	}
-
 
 	private String resolveTerm(String term, SvcLogicContext ctx) {
 		if (term == null) {
 			return (null);
 		}
 
-		LOG.debug("resolveTerm: term is " + term);
+		LOG.trace("resolveTerm: term is " + term);
 
 		if (term.startsWith("$") && (ctx != null)) {
 			// Resolve any index variables.
-
-			return ("'" + resolveCtxVariable(term.substring(1), ctx) + "'");
-		} else  {
+			term = resolveCtxVariable(term.substring(1), ctx);
+			// Escape single quote
+			if (term != null) {
+				term = term.replaceAll("'", "''");
+			}
+			return ("'" + term + "'");
+		} else {
 			return (term);
 		}
 
@@ -286,6 +269,17 @@ public class SqlResource implements SvcLogicResource {
 
 		if (ctxVarName.indexOf('[') == -1) {
 			// Ctx variable contains no arrays
+			if ("CRYPT_KEY".equals(ctxVarName)) {
+				// Handle crypt key as special case. If it's set as a context
+				// variable, use it. Otherwise, use
+				// configured crypt key.
+				String cryptKey = ctx.getAttribute(ctxVarName);
+				if ((cryptKey != null) && (cryptKey.length() > 0)) {
+					return (cryptKey);
+				} else {
+					return (CRYPT_KEY);
+				}
+			}
 			return (ctx.getAttribute(ctxVarName));
 		}
 
@@ -298,8 +292,7 @@ public class SqlResource implements SvcLogicResource {
 				int endBracketLoc = ctxVarParts[i].indexOf("]");
 				if (endBracketLoc == -1) {
 					// Missing end bracket ... give up parsing
-					LOG.warn("Variable reference " + ctxVarName
-							+ " seems to be missing a ']'");
+					LOG.warn("Variable reference " + ctxVarName + " seems to be missing a ']'");
 					return (ctx.getAttribute(ctxVarName));
 				}
 
@@ -320,27 +313,22 @@ public class SqlResource implements SvcLogicResource {
 		return (ctx.getAttribute(sbuff.toString()));
 	}
 
-
-
 	@Override
-	public QueryStatus save(String resource, boolean force, boolean localOnly,
-			String key, Map<String, String> parms, String prefix,
-			SvcLogicContext ctx) throws SvcLogicException {
-
-		return(executeSqlWrite(key, ctx));
+	public QueryStatus save(String resource, boolean force, boolean localOnly, String key, Map<String, String> parms,
+			String prefix, SvcLogicContext ctx) throws SvcLogicException {
+		return (executeSqlWrite(key, ctx));
 	}
 
 	private DbLibService getDbLibService() {
-
 		// Try to get dblib as an OSGI service
 		DbLibService dblibSvc = null;
 		BundleContext bctx = null;
 		ServiceReference sref = null;
 
-		Bundle bundle =  FrameworkUtil.getBundle(SqlResource.class);
+		Bundle bundle = FrameworkUtil.getBundle(SqlResource.class);
 
 		if (bundle != null) {
-				bctx = bundle.getBundleContext();
+			bctx = bundle.getBundleContext();
 		}
 
 		if (bctx != null) {
@@ -348,22 +336,20 @@ public class SqlResource implements SvcLogicResource {
 		}
 
 		if (sref == null) {
-			LOG.warn("Could not find service reference for DBLIB service ("
-					+ DBLIB_SERVICE + ")");
+			LOG.warn("Could not find service reference for DBLIB service (" + DBLIB_SERVICE + ")");
 		} else {
 			dblibSvc = (DbLibService) bctx.getService(sref);
 			if (dblibSvc == null) {
-
-				LOG.warn("Could not find service reference for DBLIB service ("
-						+ DBLIB_SERVICE + ")");
+				LOG.warn("Could not find service reference for DBLIB service (" + DBLIB_SERVICE + ")");
 			}
 		}
 
 		if (dblibSvc == null) {
-			// Must not be running in an OSGI container.  See if you can load it as a
+			// Must not be running in an OSGI container. See if you can load it
+			// as a
 			// a POJO then.
 			try {
-			dblibSvc = DBResourceManager.create(System.getProperties());
+				dblibSvc = DBResourceManager.create(System.getProperties());
 			} catch (Exception e) {
 				LOG.error("Caught exception trying to create dblib service", e);
 			}
@@ -376,72 +362,142 @@ public class SqlResource implements SvcLogicResource {
 		return (dblibSvc);
 	}
 
-
-
 	@Override
-	public QueryStatus notify(String resource, 	String action,	String key, SvcLogicContext ctx) throws SvcLogicException {
-		if(LOG.isDebugEnabled()) {
-			LOG.debug("SqlResource.notify called with resource="+resource+", action="+action);
+	public QueryStatus notify(String resource, String action, String key, SvcLogicContext ctx)
+			throws SvcLogicException {
+		if (LOG.isDebugEnabled()) {
+			LOG.debug("SqlResource.notify called with resource=" + resource + ", action=" + action);
 		}
-
-
 		return QueryStatus.SUCCESS;
 	}
 
-
 	@Override
-	public QueryStatus delete(String resource, String key, SvcLogicContext ctx)
-			throws SvcLogicException {
-
-		return(executeSqlWrite(key, ctx));
+	public QueryStatus delete(String resource, String key, SvcLogicContext ctx) throws SvcLogicException {
+		return (executeSqlWrite(key, ctx));
 	}
 
-
-	public QueryStatus update(String resource, String key,
-			Map<String, String> parms, String prefix, SvcLogicContext ctx)
-			throws SvcLogicException {
-
-		return(executeSqlWrite(key, ctx));
+	public QueryStatus update(String resource, String key, Map<String, String> parms, String prefix,
+			SvcLogicContext ctx) throws SvcLogicException {
+		return (executeSqlWrite(key, ctx));
 	}
 
-	private String encryptColValue(String value) {
-		return("AES_ENCRYPT('"+value+"','"+CRYPT_KEY+"')");
-	}
-
-	private String decryptColumn(String tableName, String colName, byte[] colValue,  DbLibService dblibSvc)
-	{
+	private String decryptColumn(String tableName, String colName, byte[] colValue, DbLibService dblibSvc) {
 		String strValue = new String(colValue);
 
 		if (StringUtils.isAsciiPrintable(strValue)) {
 
 			// If printable, not encrypted
-			return(strValue);
+			return (strValue);
 		} else {
+			Connection conn = null;
+			ResultSet results = null;
 			try {
-				CachedRowSet results = dblibSvc.getData("SELECT CAST(AES_DECRYPT('"+strValue+"','"+CRYPT_KEY+"') AS CHAR(50)) FROM DUAL", null, null);
+				// CachedRowSet results =
+				// dblibSvc.getData("SELECT
+				// CAST(AES_DECRYPT('"+strValue+"','"+CRYPT_KEY+"') AS CHAR(50))
+				// FROM DUAL",
+				// null, null);
+				conn = ((DBResourceManager) dblibSvc).getConnection();
 
-				if (results.next()) {
+				PreparedStatement stmt = conn.prepareStatement("SELECT CAST(AES_DECRYPT(?, ?) AS CHAR(50)) FROM DUAL");
+
+				stmt.setBytes(1, colValue);
+				stmt.setString(2, getCryptKey());
+
+				results = stmt.executeQuery();
+
+				if ((results != null) && results.next()) {
 					strValue = results.getString(1);
-					LOG.debug("Decrypted value is "+strValue);
+					LOG.debug("Decrypted value is " + strValue);
 				} else {
-					LOG.warn("Cannot decrypt "+tableName+"."+colName);
+					LOG.warn("Cannot decrypt " + tableName + "." + colName);
 				}
 			} catch (Exception e) {
-				LOG.error("Caught exception trying to decrypt "+tableName+"."+colName, e);
+				LOG.error("Caught exception trying to decrypt " + tableName + "." + colName, e);
+			} finally {
+				try {
+					if (results != null) {
+						results.close();
+						results = null;
+					}
+				} catch (Exception exc) {
+
+				}
+				try {
+					if (conn != null) {
+						conn.close();
+						conn = null;
+					}
+				} catch (Exception exc) {
+
+				}
 			}
 		}
-
-		return(strValue);
+		return (strValue);
 	}
 
 	public static String getCryptKey() {
-		return(CRYPT_KEY);
+		return (CRYPT_KEY);
 	}
 
 	public static String setCryptKey(String key) {
 		CRYPT_KEY = key;
-		return(CRYPT_KEY);
+		return (CRYPT_KEY);
 	}
 
+	public String parameterizedQuery(Map<String, String> parameters, SvcLogicContext ctx) throws SvcLogicException {
+		DbLibService dblibSvc = getDbLibService();
+		String prefix = parameters.get("prefix");
+		String query = parameters.get("query");
 
+		ArrayList<String> arguments = new ArrayList<String>();
+		for (Entry<String, String> a : parameters.entrySet()) {
+			if (a.getKey().startsWith("param")) {
+				arguments.add(a.getValue());
+			}
+		}
+
+		try {
+			if (dblibSvc == null) {
+				return mapQueryStatus(QueryStatus.FAILURE);
+			}
+			if (query.contains("count") || query.contains("COUNT")) {
+				CachedRowSet results = dblibSvc.getData(query, arguments, null);
+
+				if (!results.next()) {
+					return mapQueryStatus(QueryStatus.FAILURE);
+				}
+
+				int numRows = results.getInt(1);
+				ctx.setAttribute(prefix + ".count", String.valueOf(numRows));
+				if (numRows > 0) {
+					return "true";
+				} else {
+					return "false";
+				}
+			} else if (query.startsWith("select") || query.startsWith("SELECT")) {
+				CachedRowSet results = dblibSvc.getData(query, arguments, null);
+				if (!results.next()) {
+					return mapQueryStatus(QueryStatus.NOT_FOUND);
+				} else {
+					saveCachedRowSetToCtx(results, ctx, prefix, dblibSvc);
+				}
+			} else {
+				if (!dblibSvc.writeData(query, arguments, null)) {
+					return mapQueryStatus(QueryStatus.FAILURE);
+				}
+			}
+			return mapQueryStatus(QueryStatus.SUCCESS);
+		} catch (SQLException e) {
+			LOG.error("Caught SQL exception", e);
+			return mapQueryStatus(QueryStatus.FAILURE);
+		}
+	}
+
+	protected String mapQueryStatus(QueryStatus status) {
+		String str = status.toString();
+		str = str.toLowerCase();
+		str = str.replaceAll("_", "-");
+		return str;
+	}
 }

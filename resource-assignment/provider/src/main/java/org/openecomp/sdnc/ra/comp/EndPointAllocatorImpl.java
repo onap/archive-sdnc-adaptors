@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,9 +30,13 @@ import java.util.Map;
 import org.apache.commons.lang.NotImplementedException;
 import org.openecomp.sdnc.ra.equip.data.EquipmentData;
 import org.openecomp.sdnc.rm.comp.ResourceManager;
+import org.openecomp.sdnc.rm.data.AllocationItem;
 import org.openecomp.sdnc.rm.data.AllocationOutcome;
 import org.openecomp.sdnc.rm.data.AllocationRequest;
 import org.openecomp.sdnc.rm.data.AllocationStatus;
+import org.openecomp.sdnc.rm.data.LimitAllocationItem;
+import org.openecomp.sdnc.rm.data.LimitResource;
+import org.openecomp.sdnc.rm.data.RangeAllocationItem;
 import org.openecomp.sdnc.rm.data.RangeResource;
 import org.openecomp.sdnc.rm.data.Resource;
 import org.slf4j.Logger;
@@ -59,8 +63,24 @@ public class EndPointAllocatorImpl implements EndPointAllocator {
 
 		List<EndPointData> epList = new ArrayList<>();
 		for (EndPointAllocationDefinition def : defList) {
+			if (serviceData.endPointPosition != null && !serviceData.endPointPosition.equals(def.endPointPosition))
+				continue;
+
 			log.info(
 			        "Starting allocation of end point: " + def.endPointPosition + ": " + serviceData.serviceInstanceId);
+
+			String resourceUnionId = serviceData.serviceInstanceId + '/' + def.endPointPosition;
+			String resourceSetId = resourceUnionId + '/' + changeNumber;
+
+			String equipmentId = (String) equipmentConstraints.get("equipment-id");
+			if (equipmentId == null) {
+				EndPointData epExisting = readEndPoint(resourceUnionId, resourceSetId);
+				if (epExisting != null && epExisting.equipmentId != null) {
+					equipmentConstraints.put("equipment-id", epExisting.equipmentId);
+
+					log.info("Trying assignment on the current equipment: " + epExisting.equipmentId);
+				}
+			}
 
 			List<EquipmentData> equipList = def.equipmentReader.readEquipment(equipmentConstraints);
 			if (equipList == null || equipList.isEmpty()) {
@@ -104,9 +124,6 @@ public class EndPointAllocatorImpl implements EndPointAllocator {
 					equipList.add(prefEquip.equipData);
 			}
 
-			String resourceUnionId = serviceData.serviceInstanceId + '/' + def.endPointPosition;
-			String resourceSetId = resourceUnionId + '/' + changeNumber;
-
 			for (EquipmentData equipData : equipList) {
 				boolean allgood = true;
 				if (def.allocationRuleList != null)
@@ -147,9 +164,22 @@ public class EndPointAllocatorImpl implements EndPointAllocator {
 		for (Resource r : rlist) {
 			if (r instanceof RangeResource) {
 				RangeResource rr = (RangeResource) r;
-				ep.data.put(rr.resourceKey.resourceName, rr.used.first());
-
-				ep.equipmentId = r.resourceKey.assetId;
+				for (AllocationItem ai : r.allocationItems)
+					if (ai.resourceUnionId.equals(resourceUnionId)) {
+						RangeAllocationItem rai = (RangeAllocationItem) ai;
+						ep.data.put(ep.endPointPosition + '.' + rr.resourceKey.resourceName, rai.used.first());
+					}
+			}
+			if (r instanceof LimitResource) {
+				LimitResource rr = (LimitResource) r;
+				for (AllocationItem ai : r.allocationItems)
+					if (ai.resourceUnionId.equals(resourceUnionId)) {
+						LimitAllocationItem rai = (LimitAllocationItem) ai;
+						ep.data.put(ep.endPointPosition + '.' + rr.resourceKey.resourceName + ".allocated", rai.used);
+						ep.data.put(ep.endPointPosition + '.' + rr.resourceKey.resourceName + ".used", rr.used);
+						ep.data.put(ep.endPointPosition + '.' + rr.resourceKey.resourceName + ".assetId",
+						        r.resourceKey.assetId);
+					}
 			}
 		}
 

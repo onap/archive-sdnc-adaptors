@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.openecomp.sdnc.lock.data.ResourceLock;
+import org.openecomp.sdnc.util.db.CachedDataSourceWrap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,16 +42,21 @@ public class ResourceLockDaoImpl implements ResourceLockDao {
 
 	@Override
 	public void lockTable() {
-		if (!testing)
-			jdbcTemplate.update("LOCK TABLE RESOURCE_LOCK WRITE");
+		if (!testing) {
+			jdbcTemplate.update("LOCK TABLES RESOURCE_LOCK WRITE");
 		log.info("Table RESOURCE_LOCK locked.");
+	}
 	}
 
 	@Override
 	public void unlockTable() {
-		if (!testing)
+		if (!testing) {
 			jdbcTemplate.update("UNLOCK TABLES");
 		log.info("Table RESOURCE_LOCK unlocked.");
+
+			CachedDataSourceWrap ds = (CachedDataSourceWrap) jdbcTemplate.getDataSource();
+			ds.releaseConnection();
+		}
 	}
 
 	@Override

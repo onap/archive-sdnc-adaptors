@@ -38,10 +38,10 @@ public class PInterfaceRequest extends AAIRequest {
 	// tenant (1602)
 	public static final String PINTERFACE_PATH			= "org.openecomp.sdnc.sli.aai.path.pserver.pinterface";
 	public static final String PINTERFACE_QUERY_PATH	= "org.openecomp.sdnc.sli.aai.path.pserver.pinterface.query";
-
+	
 	private final String pinterface_path;
 	private final String pinterface_query_path;
-
+	
 	public static final String HOSTNAME = "hostname";
 	public static final String PSERVER_HOSTNAME = "pserver.hostname";
 	public static final String INTERFACE_NAME = "interface-name";
@@ -58,13 +58,13 @@ public class PInterfaceRequest extends AAIRequest {
 		}
 	}
 
-
+	
 	@Override
 	public URL getRequestUrl(String method, String resourceVersion) throws UnsupportedEncodingException, MalformedURLException {
 
 		String request_url = target_uri + pinterface_path;
 		String encoded_vnf = null;
-
+		
 		String hostname = null;
 		String interfaceName = null;
 
@@ -74,7 +74,7 @@ public class PInterfaceRequest extends AAIRequest {
 		if(requestProperties.containsKey(PSERVER_HOSTNAME)) {
 			hostname = requestProperties.getProperty(PSERVER_HOSTNAME);
 		}
-
+		
 		if(requestProperties.containsKey(INTERFACE_NAME)) {
 			interfaceName = requestProperties.getProperty(INTERFACE_NAME);
 		}
@@ -96,10 +96,10 @@ public class PInterfaceRequest extends AAIRequest {
 		aaiService.LOGwriteFirstTrace(method, http_req_url.toString());
 		aaiService.LOGwriteDateTrace("hostname", hostname);
 		aaiService.LOGwriteDateTrace("interface-name", hostname);
-
+		
 		return http_req_url;
 	}
-
+	
 	@Override
 	public URL getRequestQueryUrl(String method) throws UnsupportedEncodingException, MalformedURLException {
 		return this.getRequestUrl(method, null);
@@ -125,7 +125,7 @@ public class PInterfaceRequest extends AAIRequest {
 		String[] args = {HOSTNAME, PSERVER_HOSTNAME, INTERFACE_NAME, PINTERFACE_INTERFACE_NAME};
 		return args;
 	}
-
+	
 	@Override
 	public Class<? extends AAIDatum> getModelClass() {
 		return PInterface.class;

@@ -59,7 +59,7 @@ public class SubInterface implements AAIDatum {
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
     /**
-     *
+     * 
      * @return
      *     The interfaceName
      */
@@ -69,7 +69,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @param interfaceName
      *     The interface-name
      */
@@ -79,7 +79,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @return
      *     The interfaceRole
      */
@@ -89,7 +89,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @param interfaceRole
      *     The interface-role
      */
@@ -99,7 +99,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @return
      *     The resourceVersion
      */
@@ -109,7 +109,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @param resourceVersion
      *     The resource-version
      */
@@ -119,7 +119,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @return
      *     The vlans
      */
@@ -129,7 +129,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @param vlans
      *     The vlans
      */
@@ -139,7 +139,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @return
      *     The relationshipList
      */
@@ -149,7 +149,7 @@ public class SubInterface implements AAIDatum {
     }
 
     /**
-     *
+     * 
      * @param relationshipList
      *     The relationshipList
      */

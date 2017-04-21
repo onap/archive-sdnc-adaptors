@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 package org.openecomp.sdnc.ra.alloc;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.openecomp.sdnc.ra.comp.AllocationRule;
@@ -61,29 +62,33 @@ public class DbAllocationRule implements AllocationRule {
 		        endPointPosition, equipmentData.equipmentLevel);
 		List<RangeRule> rangeRuleList =
 		        rangeRuleDao.getRangeRules(serviceData.serviceModel, endPointPosition, equipmentData.equipmentLevel);
-		if (resourceRuleList.isEmpty() && rangeRuleList.isEmpty())
-			return null;
-		if (resourceRuleList.size() == 1 && rangeRuleList.isEmpty())
-			return buildAllocationRequest(resourceRuleList.get(0), resourceUnionId, resourceSetId, serviceData,
-			        equipmentData, checkOnly, change);
 
-		if (resourceRuleList.isEmpty() && rangeRuleList.size() == 1)
-			return buildAllocationRequest(rangeRuleList.get(0), resourceUnionId, resourceSetId, serviceData,
+		List<AllocationRequest> arlist = new ArrayList<AllocationRequest>();
+
+		for (ResourceRule rr : resourceRuleList) {
+			if (serviceData.resourceName != null && !serviceData.resourceName.equals(rr.resourceName))
+				continue;
+			AllocationRequest ar1 = buildAllocationRequest(rr, resourceUnionId, resourceSetId, serviceData,
 			        equipmentData, checkOnly, change);
+			arlist.add(ar1);
+		}
+		for (RangeRule rr : rangeRuleList) {
+			if (serviceData.resourceName != null && !serviceData.resourceName.equals(rr.rangeName))
+				continue;
+			AllocationRequest ar1 = buildAllocationRequest(rr, resourceUnionId, resourceSetId, serviceData,
+			        equipmentData, checkOnly, change);
+			arlist.add(ar1);
+		}
+
+		if (arlist.isEmpty())
+			return null;
+
+		if (arlist.size() == 1)
+			return arlist.get(0);
 
 		MultiResourceAllocationRequest ar = new MultiResourceAllocationRequest();
 		ar.stopOnFirstFailure = false;
-		ar.allocationRequestList = new ArrayList<AllocationRequest>();
-		for (ResourceRule rr : resourceRuleList) {
-			AllocationRequest ar1 = buildAllocationRequest(rr, resourceUnionId, resourceSetId, serviceData,
-			        equipmentData, checkOnly, change);
-			ar.allocationRequestList.add(ar1);
-		}
-		for (RangeRule rr : rangeRuleList) {
-			AllocationRequest ar1 = buildAllocationRequest(rr, resourceUnionId, resourceSetId, serviceData,
-			        equipmentData, checkOnly, change);
-			ar.allocationRequestList.add(ar1);
-		}
+		ar.allocationRequestList = arlist;
 		return ar;
 	}
 
@@ -101,6 +106,8 @@ public class DbAllocationRule implements AllocationRule {
 		ar.resourceSetId = resourceSetId;
 		ar.resourceUnionId = resourceUnionId;
 		ar.resourceName = resourceRule.resourceName;
+		if (serviceData.resourceShareGroup != null)
+			ar.resourceShareGroupList = Collections.singleton(serviceData.resourceShareGroup);
 		ar.assetId = equipmentData.equipmentId;
 		ar.missingResourceAction = AllocationAction.Succeed_Allocate;
 		ar.expiredResourceAction = AllocationAction.Succeed_Allocate;

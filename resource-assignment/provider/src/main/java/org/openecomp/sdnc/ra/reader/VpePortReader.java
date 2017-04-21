@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,16 @@ public class VpePortReader implements EquipmentReader {
 	public List<EquipmentData> readEquipment(Map<String, Object> equipmentConstraints) {
 		String clli = (String) equipmentConstraints.get("clli");
 		String vpeName = (String) equipmentConstraints.get("vpe-name");
+		if (vpeName == null) {
+			String equipmentId = (String) equipmentConstraints.get("equipment-id");
+			if (equipmentId != null) {
+				int i1 = equipmentId.indexOf('/');
+				if (i1 > 0)
+					equipmentId = equipmentId.substring(0, i1);
+				vpeName = equipmentId;
+			}
+		}
+
 		List<Map<String, Object>> vpeDataList = vpePortDao.getVpePortData(clli, vpeName);
 
 		List<EquipmentData> equipList = new ArrayList<>();

@@ -4,7 +4,7 @@
   openECOMP : SDN-C
   ================================================================================
   Copyright (C) 2017 AT&T Intellectual Property. All rights
-              reserved.
+  						reserved.
   ================================================================================
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -31,8 +31,16 @@
 		<property name="dataSource" ref="dblib.dataSource" />
 	</bean>
 
+	<bean id="lock.dataSource" class="org.openecomp.sdnc.util.db.CachedDataSourceWrap">
+		<property name="dataSource" ref="rm.dataSource" />
+	</bean>
+
 	<bean id="rm.jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
 		<property name="dataSource" ref="rm.dataSource" />
+	</bean>
+
+	<bean id="lock.jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<property name="dataSource" ref="lock.dataSource" />
 	</bean>
 
 	<!-- Utils Configuration -->
@@ -44,7 +52,7 @@
 	<!-- Resource Lock Configuration -->
 
 	<bean id="resourceLockDao" class="org.openecomp.sdnc.lock.dao.ResourceLockDaoImpl">
-		<property name="jdbcTemplate" ref="rm.jdbcTemplate" />
+		<property name="jdbcTemplate" ref="lock.jdbcTemplate" />
 	</bean>
 
 	<bean id="lockHelper" class="org.openecomp.sdnc.lock.comp.LockHelperImpl">
@@ -191,6 +199,7 @@
 							<property name="equipmentReader" ref="vpePortReader" />
 							<property name="equipmentCheckList">
 								<list>
+									<ref bean="vlanSpeedCheck" />
 									<ref bean="provStatusCheck" />
 									<ref bean="excludeVpeCheck" />
 									<ref bean="vpeLockCheck" />
@@ -225,7 +234,19 @@
 		<property name="vpePortDao" ref="vpePortDao" />
 	</bean>
 
+	<bean id="vnfReader" class="org.openecomp.sdnc.ra.reader.VnfReader">
+	</bean>
+
+	<bean id="aicSiteReader" class="org.openecomp.sdnc.ra.reader.AicSiteReader">
+	</bean>
+
+	<bean id="uplinkCircuitReader" class="org.openecomp.sdnc.ra.reader.UplinkCircuitReader">
+	</bean>
+
 	<!-- Equipment Checks Configuration -->
+
+	<bean id="vlanSpeedCheck" class="org.openecomp.sdnc.ra.check.VlanSpeedCheck">
+	</bean>
 
 	<bean id="provStatusCheck" class="org.openecomp.sdnc.ra.check.ProvStatusCheck">
 	</bean>

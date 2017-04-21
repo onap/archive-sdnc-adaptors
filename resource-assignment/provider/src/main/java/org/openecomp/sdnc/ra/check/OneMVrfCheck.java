@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- *             reserved.
+ * 						reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,11 +66,18 @@ public class OneMVrfCheck implements EquipmentCheck {
 				if (ai.resourceShareGroupList.contains(vrfName))
 					return true;
 
+		String resourceUnionId = serviceData.serviceInstanceId + '/' + serviceData.endPointPosition;
+
 		// Check if there is already another multicast VRF for the same VPN
 		VpnParam vpnp = VrfUtil.parseVrfInstanceName(vrfName);
 		r = resourceManager.getResource("MVRF", equipData.equipmentId);
-		if (r != null && r.allocationItems != null)
+		if (r != null && r.allocationItems != null) {
 			for (AllocationItem ai : r.allocationItems) {
+
+				// Skip the allocation item for the current service instance, if there, in case it is a change order
+				if (ai.resourceUnionId.equals(resourceUnionId))
+					continue;
+
 				if (ai.resourceShareGroupList != null && ai.resourceShareGroupList.size() > 0) {
 					String vrfName2 = ai.resourceShareGroupList.iterator().next();
 					VpnParam vpnp2 = VrfUtil.parseVrfInstanceName(vrfName2);
@@ -82,6 +89,7 @@ public class OneMVrfCheck implements EquipmentCheck {
 					}
 				}
 			}
+		}
 
 		return true;
 	}

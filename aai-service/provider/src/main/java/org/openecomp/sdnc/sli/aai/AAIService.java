@@ -383,6 +383,68 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
         return con;
 	}
 
+	/* (non-Javadoc)
+	 * @see org.openecomp.sdnc.sli.resource.aic.AnAIClient#requestSdnZoneQuery(java.lang.String, java.lang.String, java.lang.String)
+	 */
+	@Override
+	public SdnZoneResponse requestSdnZoneQuery(String service_type, String vnf_type, String physical_location) throws AAIServiceException {
+		SdnZoneResponse response = null;
+		InputStream inputStream = null;
+
+		try {
+			URL http_req_url =	getRequestURL(service_type, vnf_type, physical_location);
+
+            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
+
+            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
+            LOGwriteDateTrace("service_type", service_type);
+            LOGwriteDateTrace("vnf_type", vnf_type);
+            LOGwriteDateTrace("physical_location", physical_location);
+
+            // Check for errors
+            int responseCode = con.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+            	inputStream = con.getInputStream();
+            } else {
+            	inputStream = con.getErrorStream();
+            }
+
+            // Process the response
+            LOG.debug("HttpURLConnection result:" + responseCode);
+            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
+            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
+
+            ObjectMapper mapper = getObjectMapper();
+
+			if (responseCode == HttpURLConnection.HTTP_OK) {
+            	response = mapper.readValue(reader, SdnZoneResponse.class);
+            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
+			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
+            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
+            	return response;
+            } else {
+            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
+            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
+            	throw new AAIServiceException(responseCode, errorresponse);
+            }
+
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestServiceInterfaceData", exc);
+			throw new AAIServiceException(exc);
+		} finally {
+			if(inputStream != null){
+				try {
+					inputStream.close();
+				} catch(Exception exc) {
+
+				}
+			}
+		}
+		return response;
+	}
+
 	@Override
 	public GenericVnf requestGenericVnfData(String vnf_id) throws AAIServiceException {
 		GenericVnf response = null;
@@ -440,6 +502,73 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		}
 		return response;
 	}
+
+	/* (non-Javadoc)
+	 * @see org.openecomp.sdnc.sli.resource.aic.AnAIClient#requestSdnZoneQuery(java.lang.String, java.lang.String, java.lang.String)
+	 */
+	@Override
+	public Vce requestNetworkVceData(String vnf_id) throws AAIServiceException {
+		Vce response = null;
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vce");
+			request.addRequestProperty("vce.vnf-id", vnf_id);
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, Vce.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
+			throw new AAIServiceException(exc);
+		}
+
+		return response;
+	}
+
+
+	/* (non-Javadoc)
+	 * @see org.openecomp.sdnc.sli.resource.aic.AnAIClient#requestSdnZoneQuery(java.lang.String, java.lang.String, java.lang.String)
+	 */
+	@Override
+	public boolean deleteNetworkVceData(String vnf_id, String resourceVersion) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vce");
+			request.addRequestProperty("vce.vnf-id", vnf_id);
+			response = executor.delete(request, resourceVersion);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("deleteNetworkVceData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	/* (non-Javadoc)
+	 * @see org.openecomp.sdnc.sli.resource.aic.AnAIClient#postNetworkVceData(java.lang.String, org.openecomp.sdnc.sli.resource.aic.aai.VCERequest)
+	 */
+	@Override
+	public boolean postNetworkVceData(String vnf_id, Vce data) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vce");
+			request.addRequestProperty("vce.vnf-id", vnf_id);
+			request.setRequestObject(data);
+			response = executor.post(request);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestGenericVnfData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
 
 	@Override
 	public SearchResults requestServiceInstanceURL(String svc_instance_id) throws AAIServiceException {
@@ -708,7 +837,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	{
 		String encrypted_url = selection;
 		String apnpattern =
-				"/aai/v2/business/customers/customer/(.+)/service-subscriptions/service-subscription/(.+)/service-instances/service-instance/(.+)/";
+				"/aai/v10/business/customers/customer/(.+)/service-subscriptions/service-subscription/(.+)/service-instances/service-instance/(.+)/";
 		Pattern pattern = Pattern.compile(apnpattern);
 
 		try {
@@ -733,6 +862,188 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		}
 
 		return encrypted_url;
+	}
+
+	@Override
+	public Vpe requestNetworkVpeData(String vnf_id) throws AAIServiceException {
+		Vpe response = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vpe");
+			request.addRequestProperty("vpe.vnf-id", vnf_id);
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, Vpe.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public boolean postNetworkVpeData(String vnf_id, Vpe data) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vpe");
+			request.addRequestProperty("vpe.vnf-id", vnf_id);
+			request.setRequestObject(data);
+			response = executor.post(request);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
+			throw new AAIServiceException(exc);
+		}
+
+		return response;
+	}
+
+	@Override
+	public boolean deleteNetworkVpeData(String vnf_id, String resourceVersion) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vpe");
+			request.addRequestProperty("vpe.vnf-id", vnf_id);
+			response = executor.delete(request, resourceVersion);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+		public VplsPe requestNetworkVplsPeData(String equipment_name)throws AAIServiceException {
+			VplsPe response = null;
+
+			try {
+				AAIRequest request = AAIRequest.getRequestFromResource("vpls-pe");
+				request.addRequestProperty("vpls-pe.equipment-name", equipment_name);
+
+				String rv = executor.get(request);
+				if(rv != null) {
+					ObjectMapper mapper = getObjectMapper();
+					response = mapper.readValue(rv, VplsPe.class);
+				}
+			} catch(AAIServiceException aaiexc) {
+				throw aaiexc;
+			} catch (Exception exc) {
+				LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
+				throw new AAIServiceException(exc);
+			}
+			return response;
+		}
+
+	@Override
+	public boolean postNetworkVplsPeData(String equipment_name, VplsPe data) throws AAIServiceException {
+		boolean response = false;
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vpls-pe");
+			request.addRequestProperty("vpls-pe.equipment-name", equipment_name);
+			request.setRequestObject(data);
+			response = executor.post(request);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestGenericVnfData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public boolean deleteNetworkVplsPeData(String vnf_id, String resourceVersion)	throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vpls-pe");
+			request.addRequestProperty("vpls-pe.equipment-name", vnf_id);
+			response = executor.delete(request, resourceVersion);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("deleteNetworkVplsPeData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public Complex  requestNetworkComplexData(String pLocId) throws AAIServiceException {
+		Complex response = null;
+		InputStream inputStream = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("complex");
+			request.addRequestProperty("complex.physical-location-id", pLocId);
+
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, Complex.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestNetworkComplexData", exc);
+			throw new AAIServiceException(exc);
+		} finally {
+			if(inputStream != null){
+				try {
+					inputStream.close();
+				} catch(Exception exc) {
+
+				}
+			}
+		}
+		return response;
+	}
+
+	@Override
+	public boolean postNetworkComplexData(String vnf_id, Complex data) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("complex");
+			request.addRequestProperty("complex.physical-location-id", vnf_id);
+			request.setRequestObject(data);
+			response = executor.post(request);
+
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("postNetworkComplexData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public boolean deleteNetworkComplexData(String pLocId, String resourceVersion) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("complex");
+			request.addRequestProperty("complex.physical-location-id", pLocId);
+
+			response = executor.delete(request, resourceVersion);
+
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("deleteNetworkComplexData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
 	}
 
 	/*
@@ -862,6 +1173,101 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	}
 
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.openecomp.sdnc.sli.aai.AAIClient#requestCtagPoolData(String)
+	 */
+	@Override
+	public CtagPool requestCtagPoolData(String physical_location_id, String target_pe, String availability_zone_name)	throws AAIServiceException {
+		CtagPool response = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("ctag-pool");
+
+			request.addRequestProperty("ctag-pool.target-pe", target_pe);
+			request.addRequestProperty("ctag-pool.availability-zone-name", availability_zone_name);
+			request.addRequestProperty("complex.physical-location-id", physical_location_id);
+
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, CtagPool.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestNetworkVceData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	//==================== DvsSwitch ======================
+	@Override
+	public DvsSwitch  requestDvsSwitchData(String vnf_id) throws AAIServiceException {
+		DvsSwitch response = null;
+		InputStream inputStream = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("dvs-switch");
+			request.addRequestProperty("dvs-switch.switch-name", vnf_id);
+
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, DvsSwitch.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestDvsSwitchData", exc);
+			throw new AAIServiceException(exc);
+		} finally {
+			if(inputStream != null){
+				try {
+					inputStream.close();
+				} catch(Exception exc) {
+
+				}
+			}
+		}
+		return response;
+	}
+
+	@Override
+	public boolean postDvsSwitchData(String switch_name, DvsSwitch data) throws AAIServiceException {
+		boolean response = false;
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("dvs-switch");
+			request.addRequestProperty("dvs-switch.switch-name", switch_name);
+			request.setRequestObject(data);
+			response = executor.post(request);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public boolean deleteDvsSwitchData(String vnf_id, String resourceVersion) throws AAIServiceException {
+		boolean response = false;
+		InputStream inputStream = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("dvs-switch");
+			request.addRequestProperty("dvs-switch.switch-name", vnf_id);
+			response = executor.delete(request, resourceVersion);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("deleteDvsSwitchData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
 	//================== End of DvsSwitch =================
 	//==================== PhysicalLink ======================
 	@Override
@@ -1033,6 +1439,116 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		}
 		return response;
 	}
+	//================== End of PInterface =================
+	//==================== SitePairSet ======================
+	@Override
+	public SitePairSet requestSitePairSetData(String sitePairSetId) throws AAIServiceException {
+		SitePairSet response = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("site-pair-set");
+			request.addRequestProperty("site-pair-set.site-pair-set-id", sitePairSetId);
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, SitePairSet.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public boolean postSitePairSetData(String linkName, SitePairSet request) throws AAIServiceException {
+		InputStream inputStream = null;
+
+		try {
+
+			ObjectMapper mapper = getObjectMapper();
+			String json_text = mapper.writeValueAsString(request);
+
+			SSLSocketFactory sockFact = CTX.getSocketFactory();
+
+			String request_url = target_uri+site_pair_set_path;
+			String encoded_vnf = encodeQuery(linkName);
+			request_url = request_url.replace("{site-pair-set-id}", encoded_vnf) ;
+			URL http_req_url =	new URL(request_url);
+
+			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.PUT);
+
+            OutputStreamWriter osw = new OutputStreamWriter(con.getOutputStream());
+            osw.write(json_text);
+            osw.flush();
+            osw.close();
+
+
+            LOGwriteFirstTrace("PUT", request_url);
+            LOGwriteDateTrace("link-name", linkName);
+            LOGwriteDateTrace("SitePairSet", json_text);
+
+            // Check for errors
+            int responseCode = con.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+            	inputStream = con.getInputStream();
+            } else {
+            	inputStream = con.getErrorStream();
+            }
+
+            // Process the response
+            BufferedReader reader;
+            String line = null;
+            reader = new BufferedReader( new InputStreamReader( inputStream ) );
+
+			if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+				StringBuilder stringBuilder = new StringBuilder();
+
+				while( ( line = reader.readLine() ) != null ) {
+					stringBuilder.append( line );
+				}
+				LOGwriteEndingTrace(responseCode, "SUCCESS", (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
+				return true;
+            } else {
+            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
+            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
+
+            	throw new AAIServiceException(responseCode, errorresponse);
+            }
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("postSitePairSetData", exc);
+			throw new AAIServiceException(exc);
+		} finally {
+			try {
+				if(inputStream != null)
+				inputStream.close();
+			} catch (Exception exc) {
+
+			}
+		}
+	}
+
+	@Override
+	public boolean deleteSitePairSetData(String linkName, String resourceVersion) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("site-pair-set");
+			request.addRequestProperty("site-pair-set.site-pair-set-id", linkName);
+			response = executor.delete(request, resourceVersion);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("deleteSitePairSetData", exc);
+			throw new AAIServiceException(exc);
+		}
+
+		return response;
+	}
 	//================== End of SitePairSet =================
 	//==================== Service ======================
 	@Override
@@ -1172,6 +1688,56 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	}
 
 	@Override
+	public CtagPool dataChangeRequestCtagPoolData(URL url) throws AAIServiceException {
+
+		if(url ==  null) {
+			throw new NullPointerException();
+		}
+
+		return this.getResource(url.toString(), CtagPool.class);
+	}
+
+	@Override
+	public VplsPe dataChangeRequestVplsPeData(URL url) throws AAIServiceException {
+
+		if(url ==  null) {
+			throw new NullPointerException();
+		}
+
+		return this.getResource(url.toString(), VplsPe.class);
+	}
+
+	@Override
+	public Vpe dataChangeRequestVpeData(URL url) throws AAIServiceException {
+
+		if(url ==  null) {
+			throw new NullPointerException();
+		}
+
+		return this.getResource(url.toString(), Vpe.class);
+	}
+
+	@Override
+	public DvsSwitch dataChangeRequestDvsSwitchData(URL url) throws AAIServiceException {
+
+		if(url ==  null) {
+			throw new NullPointerException();
+		}
+
+		return this.getResource(url.toString(), DvsSwitch.class);
+	}
+
+	@Override
+	public OamNetwork dataChangeRequestOAMNetworkData(URL url) throws AAIServiceException {
+
+		if(url ==  null) {
+			throw new NullPointerException();
+		}
+
+		return this.getResource(url.toString(), OamNetwork.class);
+	}
+
+	@Override
 	public AvailabilityZone dataChangeRequestAvailabilityZoneData(URL url) throws AAIServiceException {
 
 		if(url ==  null) {
@@ -1179,6 +1745,16 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		}
 
 		return this.getResource(url.toString(), AvailabilityZone.class);
+	}
+
+	@Override
+	public Complex dataChangeRequestComplexData(URL url) throws AAIServiceException {
+
+		if(url ==  null) {
+			throw new NullPointerException();
+		}
+
+		return this.getResource(url.toString(), Complex.class);
 	}
 
 	/* DELETE */
@@ -1360,6 +1936,66 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
     }
 
 	@Override
+	public Pserver requestPServerData(String hostname) throws AAIServiceException {
+		Pserver response = null;
+		InputStream inputStream = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("pserver");
+			request.addRequestProperty("pserver.hostname", hostname);
+
+
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, Pserver.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestPServerData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public boolean postPServerData(String hostname, Pserver data) throws AAIServiceException {
+		boolean response = false;
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("pserver");
+			request.addRequestProperty("pserver.hostname", hostname);
+			request.setRequestObject(data);
+			response = executor.post(request);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public boolean deletePServerData(String hostname, String resourceVersion) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("pserver");
+			request.addRequestProperty("pserver.hostname", hostname);
+			response = executor.delete(request, resourceVersion);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("deletePServerData", exc);
+			throw new AAIServiceException(exc);
+		}
+
+		return response;
+	}
+
+
+	@Override
 	public L3Network requestL3NetworkData(String networkId) throws AAIServiceException {
 		L3Network response = null;
 		InputStream inputStream = null;
@@ -1446,6 +2082,157 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			throw new AAIServiceException(exc);
 		}
 
+		return response;
+	}
+
+
+	@Override
+	public VpnBinding requestVpnBindingData(String vpnId) throws AAIServiceException {
+		VpnBinding response = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vpn-binding");
+			request.addRequestProperty("vpn-binding.vpn-id", vpnId);
+
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, VpnBinding.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestVpnBindingData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public boolean deleteVpnBindingData(String vpnId, String resourceVersion) throws AAIServiceException {
+		boolean response = false;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vpn-binding");
+			request.addRequestProperty("vpn-binding.vpn-id", vpnId);
+			response = executor.delete(request, resourceVersion);
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("deleteVpnBindingData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+
+	@Override
+	public VnfImage requestVnfImageData(String att_uuid) throws AAIServiceException {
+		VnfImage response = null;
+
+		try {
+			AAIRequest request = AAIRequest.getRequestFromResource("vnf-image");
+			request.addRequestProperty("vnf-image.att-uuid", att_uuid);
+
+			String rv = executor.get(request);
+			if(rv != null) {
+				ObjectMapper mapper = getObjectMapper();
+				response = mapper.readValue(rv, VnfImage.class);
+			}
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestVnfImageData", exc);
+			throw new AAIServiceException(exc);
+		}
+		return response;
+	}
+
+	@Override
+	public VnfImage requestVnfImageDataByVendorModel(String vendor, String model) throws AAIServiceException {
+		return requestVnfImageDataByVendorModelVersion(vendor, model, null);
+	}
+
+	@Override
+	public VnfImage requestVnfImageDataByVendorModelVersion(String vendor, String model, String version) throws AAIServiceException
+	{
+		List<VnfImage> responseList = new ArrayList<VnfImage>();
+		VnfImage response = null;
+		InputStream inputStream = null;
+
+		try {
+			String request_url = target_uri+vnf_image_query_path + (version==null? "": "&application-version={application_version}");
+			request_url = request_url.replace("{application_vendor}", encodeQuery(vendor)) ;
+			request_url = request_url.replace("{application_model}", encodeQuery(model)) ;
+			if(version != null) {
+				request_url = request_url.replace("{application_version}", encodeQuery(version)) ;
+			}
+			URL http_req_url =	new URL(request_url);
+
+            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
+
+            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
+            LOGwriteDateTrace("application_vendor", vendor);
+            LOGwriteDateTrace("application_model", model);
+            if(version != null) {
+            	LOGwriteDateTrace("application_version", version);
+            }
+
+            // Check for errors
+            int responseCode = con.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+            	inputStream = con.getInputStream();
+            } else {
+            	inputStream = con.getErrorStream();
+            }
+
+            // Process the response
+            LOG.debug("HttpURLConnection result:" + responseCode);
+            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
+            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
+
+            ObjectMapper mapper = getObjectMapper();
+
+			if (responseCode == HttpURLConnection.HTTP_OK) {
+//				StringBuilder stringBuilder = new StringBuilder("\n");
+//				String line = null;
+//				while( ( line = reader.readLine() ) != null ) {
+//					stringBuilder.append("\n").append( line );
+//				}
+//				LOG.info(stringBuilder.toString());
+            	response = mapper.readValue(reader, VnfImage.class);
+            	String original_buffer = mapper.writeValueAsString(response);
+            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", original_buffer);
+            	if(response.getApplicationVendor() == null  /*&& response.getAdditionalProperties() != null && !response.getAdditionalProperties().isEmpty()*/){
+            		LOG.warn("A List of multiple VNF-IMAGE entries has been returned");
+            		VnfImages listOfObjects = mapper.readValue(original_buffer, VnfImages.class);
+            		if(!listOfObjects.getVnfImage().isEmpty()) {
+            			response = listOfObjects.getVnfImage().get(0);
+            		}
+            	}
+			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
+            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
+            	return response;
+			} else {
+            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
+            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
+            	throw new AAIServiceException(responseCode, errorresponse);
+            }
+
+		} catch(AAIServiceException aaiexc) {
+			throw aaiexc;
+		} catch (Exception exc) {
+			LOG.warn("requestVnfImageData", exc);
+			throw new AAIServiceException(exc);
+		} finally {
+			if(inputStream != null){
+				try {
+					inputStream.close();
+				} catch(Exception exc) {
+
+				}
+			}
+		}
 		return response;
 	}
 
@@ -2589,6 +3376,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	}
 
 	private String rewriteKey(String resource, String key, SvcLogicContext ctx) {
+		LOG.info("AAI Deprecation - the format of request key is no longer supported. Please rewrite this key : " + key);
 
 		Class<? extends AAIDatum> clazz = null;
 		try {
