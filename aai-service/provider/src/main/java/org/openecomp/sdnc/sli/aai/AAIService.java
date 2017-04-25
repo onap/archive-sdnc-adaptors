@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- * 						reserved.
+ * 							reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,12 +70,12 @@ import javax.ws.rs.core.UriBuilder;
 import javax.xml.bind.annotation.XmlElement;
 
 import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.openecomp.sdnc.sli.ConfigurationException;
-
+import org.openecomp.sdnc.sli.MetricLogger;
 import org.openecomp.sdnc.sli.SvcLogicContext;
 import org.openecomp.sdnc.sli.SvcLogicException;
 import org.openecomp.sdnc.sli.SvcLogicResource;
@@ -154,7 +154,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	private SSLContext CTX;
 
-//	private final MetricLogger ml = new MetricLogger();
+	private final MetricLogger ml = new MetricLogger();
 
 	private final AAIRequestExecutor executor;
 
@@ -369,7 +369,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
     	con.setRequestProperty( "Content-Type",  "PATCH".equalsIgnoreCase(method) ? "application/merge-patch+json" : "application/json" );
         con.setRequestProperty("X-FromAppId", application_id);
         con.setRequestProperty("X-TransactionId",TransactionIdTracker.getNextTransactionId());
-//        con.setRequestProperty(MetricLogger.REQUEST_ID, ml.getRequestID());
+        con.setRequestProperty(MetricLogger.REQUEST_ID, ml.getRequestID());
 
         if(user_name != null && !user_name.isEmpty() && user_password != null && !user_password.isEmpty()) {
         	String basicAuth = "Basic " + new String(Base64.encodeBase64((user_name + ":" + user_password).getBytes()));
@@ -470,20 +470,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postGenericVnfData(String vnf_id, GenericVnf data) throws AAIServiceException {
-		boolean response = false;
-
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("generic-vnf");
 			request.addRequestProperty("generic-vnf.vnf-id", vnf_id);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("requestGenericVnfData", exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	@Override
@@ -553,20 +551,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	 */
 	@Override
 	public boolean postNetworkVceData(String vnf_id, Vce data) throws AAIServiceException {
-		boolean response = false;
-
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("vce");
 			request.addRequestProperty("vce.vnf-id", vnf_id);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("requestGenericVnfData", exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 
@@ -637,77 +633,6 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		return response;
 	}
 
-
-	@Override
-	public ServiceInstance requestServiceInterfaceData(String svc_instance_id) throws AAIServiceException {
-		ServiceInstance response = null;
-		InputStream inputStream = null;
-
-		try {
-			SearchResults search_result = this.requestServiceInstanceURL(svc_instance_id);
-			ResultData[] array = search_result.getResultData().toArray(new ResultData[0]);
-			ResultData datum = array[0];
-
-			String request_url = datum.getResourceLink();
-			request_url = encodeCustomerURL(request_url);
-
-			URL http_req_url =	new URL(request_url);
-			HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
-
-            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
-            LOGwriteDateTrace("svc_instance_id", svc_instance_id);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK) {
-//				StringBuilder stringBuilder = new StringBuilder("\n");
-//				String line = null;
-//				while( ( line = reader.readLine() ) != null ) {
-//					stringBuilder.append("\n").append( line );
-//				}
-//				LOG.info(stringBuilder.toString());
-            	response = mapper.readValue(reader, ServiceInstance.class);
-            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-            	return response;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
-		} catch(AAIServiceException aaiexc) {
-			throw aaiexc;
-		} catch (Exception exc) {
-			LOG.warn("requestServiceInterfaceData", exc);
-			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
-		}
-		return response;
-	}
-
-
 	@Override
 	public ServiceInstance requestServiceInterfaceData(String customer_id, String service_type, String svc_instance_id) throws AAIServiceException {
 		ServiceInstance response = null;
@@ -734,22 +659,20 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postServiceInterfaceData(String customer_id, String service_type, String svc_instance_id, ServiceInstance data) throws AAIServiceException {
-		boolean response = false;
-
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("service-instance");
 			request.addRequestProperty("customer.customer-id", customer_id);
 			request.addRequestProperty("service-subscription.service-type", service_type);
 			request.addRequestProperty("service-instance.service-instance-id", svc_instance_id);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("requestGenericVnfData", exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	/*
@@ -887,21 +810,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postNetworkVpeData(String vnf_id, Vpe data) throws AAIServiceException {
-		boolean response = false;
-
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("vpe");
 			request.addRequestProperty("vpe.vnf-id", vnf_id);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
 			throw new AAIServiceException(exc);
 		}
-
-		return response;
 	}
 
 	@Override
@@ -945,19 +865,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postNetworkVplsPeData(String equipment_name, VplsPe data) throws AAIServiceException {
-		boolean response = false;
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("vpls-pe");
 			request.addRequestProperty("vpls-pe.equipment-name", equipment_name);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("requestGenericVnfData", exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	@Override
@@ -1010,21 +929,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postNetworkComplexData(String vnf_id, Complex data) throws AAIServiceException {
-		boolean response = false;
-
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("complex");
 			request.addRequestProperty("complex.physical-location-id", vnf_id);
 			request.setRequestObject(data);
-			response = executor.post(request);
-
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("postNetworkComplexData", exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	@Override
@@ -1078,8 +994,6 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postVServerData(String tenantId, String vserverId, String cloudOwner, String cloudRegionId, Vserver data) throws AAIServiceException {
-		boolean response = false;
-
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("vserver");
 			request.addRequestProperty("cloud-region.cloud-owner", cloudOwner);
@@ -1087,14 +1001,14 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			request.addRequestProperty("tenant.tenant-id", tenantId);
 			request.addRequestProperty("vserver.vserver-id", vserverId);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("postNetworkComplexData", exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	@Override
@@ -1236,19 +1150,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postDvsSwitchData(String switch_name, DvsSwitch data) throws AAIServiceException {
-		boolean response = false;
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("dvs-switch");
 			request.addRequestProperty("dvs-switch.switch-name", switch_name);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	@Override
@@ -1294,19 +1207,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postPhysicalLinkData(String linkName, PhysicalLink data) throws AAIServiceException {
-		boolean response = false;
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("physical-link");
 			request.addRequestProperty("physical-link.link-name", linkName);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	@Override
@@ -1961,19 +1873,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postPServerData(String hostname, Pserver data) throws AAIServiceException {
-		boolean response = false;
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("pserver");
 			request.addRequestProperty("pserver.hostname", hostname);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	@Override
@@ -2052,19 +1963,18 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postL3NetworkData(String networkId, L3Network data) throws AAIServiceException {
-		boolean response = false;
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("l3-network");
 			request.addRequestProperty("l3-network.network-id", networkId);
 			request.setRequestObject(data);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn(new Object(){}.getClass().getEnclosingMethod().getName(), exc);
 			throw new AAIServiceException(exc);
 		}
-		return response;
 	}
 
 	@Override
@@ -2650,7 +2560,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		}
 
 		@Override
-		public Boolean post(AAIRequest request) throws AAIServiceException {
+		public String post(AAIRequest request) throws AAIServiceException {
 			InputStream inputStream = null;
 			String requestId = UUID.randomUUID().toString();
 
@@ -2707,7 +2617,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 						stringBuilder.append( line );
 					}
 					LOGwriteEndingTrace(responseCode, responseMessage, (stringBuilder != null) ? stringBuilder.toString() : "{no-data}");
-					return true;
+					return stringBuilder.toString();
 	            } else {
 	            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
 	            	LOGwriteEndingTrace(responseCode, responseMessage, mapper.writeValueAsString(errorresponse));
@@ -2994,23 +2904,20 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public boolean postTenantData(String tenant_id, String cloudOwner, String cloudRegionId, Tenant tenannt) throws AAIServiceException {
-		Boolean response = null;
-
 		try {
 			AAIRequest request = AAIRequest.getRequestFromResource("tenant");
 			request.addRequestProperty("tenant.tenant-id", tenant_id);
 			request.addRequestProperty("cloud-region.cloud-owner", cloudOwner);
 			request.addRequestProperty("cloud-region.cloud-region-id", cloudRegionId);
 			request.setRequestObject(tenannt);
-			response = executor.post(request);
+			Object response = executor.post(request);
+			return true;
 		} catch(AAIServiceException aaiexc) {
 			throw aaiexc;
 		} catch (Exception exc) {
 			LOG.warn("postTenantData", exc);
 			throw new AAIServiceException(exc);
 		}
-
-		return response;
 	}
 
 
@@ -3269,11 +3176,11 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 		targetServiceName = "";
 
-//		ml.logRequest(svcInstanceId, svcName, partnerName, targetEntity, targetServiceName, targetVirtualEntity, msg);
+		ml.logRequest(svcInstanceId, svcName, partnerName, targetEntity, targetServiceName, targetVirtualEntity, msg);
 	}
 
 	public void logMetricResponse(String requestId, int responseCode, String responseDescription){
-//		ml.logResponse(responseCode < 400 ? "SUCCESS" : "FAILURE", Integer.toBinaryString(responseCode), responseDescription);
+		ml.logResponse(responseCode < 400 ? "SUCCESS" : "FAILURE", Integer.toBinaryString(responseCode), responseDescription);
 	}
 
 	public void logKeyError(String keys){
@@ -3287,8 +3194,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	@Override
 	public QueryStatus save(String resource, boolean force, boolean localOnly, String key, Map<String, String> params, String prefix, SvcLogicContext ctx)
 			throws SvcLogicException {
+		String normResource = resource.split(":")[0];
 
-		switch(resource){
+		switch(normResource){
+		case "formatted-query":
 		case "generic-query":
 		case "named-query":
 		case "nodes-query":
@@ -3300,7 +3209,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			break;
 
 		default:
-			if(!key.contains(String.format("%s.", resource))) {
+			if(!key.contains(String.format("%s.", normResource))) {
 				key = rewriteKey(resource, key, ctx);
 			}
 		}
@@ -3310,8 +3219,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	@Override
 	public QueryStatus query(String resource, boolean localOnly, String select, String key, String prefix, String orderBy, SvcLogicContext ctx)
 		throws SvcLogicException {
+		String normResource = resource.split(":")[0];
 
-		switch(resource){
+		switch(normResource){
+		case "formatted-query":
 		case "generic-query":
 		case "named-query":
 		case "nodes-query":
@@ -3323,7 +3234,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			break;
 
 		default:
-			if(!key.contains(String.format("%s.", resource))) {
+			if(!key.contains(String.format("%s.", normResource))) {
 				key = rewriteKey(resource, key, ctx);
 			}
 		}
@@ -3333,7 +3244,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public QueryStatus delete(String resource, String key, SvcLogicContext ctx) throws SvcLogicException {
-		switch(resource){
+		String normResource = resource.split(":")[0];
+
+		switch(normResource){
+		case "formatted-query":
 		case "generic-query":
 		case "named-query":
 		case "nodes-query":
@@ -3345,7 +3259,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			break;
 
 		default:
-			if(!key.contains(String.format("%s.", resource))) {
+			if(!key.contains(String.format("%s.", normResource))) {
 				key = rewriteKey(resource, key, ctx);
 			}
 		}
@@ -3355,7 +3269,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	@Override
 	public QueryStatus update(String resource, String key, Map<String, String> params, String prefix, SvcLogicContext ctx) throws SvcLogicException {
-		switch(resource){
+		String normResource = resource.split(":")[0];
+
+		switch(normResource){
+		case "formatted-query":
 		case "generic-query":
 		case "named-query":
 		case "nodes-query":
@@ -3367,7 +3284,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			break;
 
 		default:
-			if(!key.contains(String.format("%s.", resource))) {
+			if(!key.contains(String.format("%s.", normResource))) {
 				key = rewriteKey(resource, key, ctx);
 			}
 		}
@@ -3378,9 +3295,10 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	private String rewriteKey(String resource, String key, SvcLogicContext ctx) {
 		LOG.info("AAI Deprecation - the format of request key is no longer supported. Please rewrite this key : " + key);
 
+		String normResource = resource.split(":")[0];
 		Class<? extends AAIDatum> clazz = null;
 		try {
-			clazz = AAIRequest.getClassFromResource(resource) ;
+			clazz = AAIRequest.getClassFromResource(normResource) ;
 		} catch (ClassNotFoundException e) {
 			LOG.warn("AAIRequest does not support class: " + e.getMessage());
 			return key;
@@ -3411,7 +3329,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 			else {
 				String tmpKeyName = keyName.replaceAll("_", "-");
 				if(fieldAnnotatedNames.contains(tmpKeyName)) {
-					key = key.replace(tmpKeyName, String.format("%s.%s", resource, tmpKeyName));
+					key = key.replace(tmpKeyName, String.format("%s.%s", normResource, tmpKeyName));
 				}
 			}
 		}

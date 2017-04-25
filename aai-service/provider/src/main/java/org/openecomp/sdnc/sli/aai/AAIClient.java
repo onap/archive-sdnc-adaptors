@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- * 						reserved.
+ * 							reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,9 @@
 
 package org.openecomp.sdnc.sli.aai;
 
+import java.io.IOException;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.openecomp.sdnc.sli.SvcLogicContext;
@@ -31,9 +33,9 @@ import org.openecomp.sdnc.sli.SvcLogicResource;
 import org.openecomp.sdnc.sli.SvcLogicResource.QueryStatus;
 import org.openecomp.sdnc.sli.aai.data.notify.NotifyEvent;
 import org.openecomp.sdnc.sli.aai.data.v1507.VServer;
-import org.openecomp.sdnc.sli.aai.update.Update;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.openecomp.aai.inventory.v10.*;
 
@@ -48,7 +50,6 @@ public interface AAIClient extends SvcLogicResource, SvcLogicJavaPlugin {
 	public boolean deleteNetworkVceData(String vnf_id, String resourceVersion) throws AAIServiceException;
 
 	// Service Inteface
-	public ServiceInstance requestServiceInterfaceData(String svc_instance_id) throws AAIServiceException;
 	public ServiceInstance requestServiceInterfaceData(String customer_id, String service_type, String svc_instance_id) throws AAIServiceException;
 	public boolean postServiceInterfaceData(String customer_id, String service_type, String svc_instance_id, ServiceInstance request)	throws AAIServiceException;
 	public SearchResults requestServiceInstanceURL(String svc_instance_id) throws AAIServiceException;
@@ -197,4 +198,7 @@ public interface AAIClient extends SvcLogicResource, SvcLogicJavaPlugin {
 	public QueryStatus restore(Map<String, String> params, SvcLogicContext ctx) throws SvcLogicException;
 
 	public void logKeyError(String keys);
+
+	public QueryStatus processResponseData(String rv, String resource, AAIRequest request, String prefix,  SvcLogicContext ctx, HashMap<String, String> nameValues, String modifier) throws JsonParseException, JsonMappingException, IOException, AAIServiceException ;
+
 }

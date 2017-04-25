@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- * 						reserved.
+ * 							reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,6 +113,8 @@ public abstract class AAIRequest {
 			return new NamedQueryRequest();
 		case "nodes-query":
 			return new NodesQueryRequest();
+		case "formatted-query":
+			return new FormattedQueryRequest();
 		case "linterface":
 			return new LInterfaceRequest(LInterfaceRequest.TYPE.L2_BRIDGE_SBG);
 		case "l2-bridge-sbg":
@@ -268,7 +270,7 @@ public abstract class AAIRequest {
 	}
 
 
-	protected String getRequestPath() {
+	protected String getRequestPath() throws MalformedURLException {
 		Set<String> uniqueResources = extractUniqueResourceSetFromKeys(requestProperties.stringPropertyNames());
 		BitSet bitset = new BitSet();
 		for(String key : uniqueResources) {
@@ -281,7 +283,12 @@ public abstract class AAIRequest {
 				}
 			}
 		}
-		return bitsetPaths.get(bitset);
+		
+		String path = bitsetPaths.get(bitset);
+		if(path == null) {
+			throw new MalformedURLException("PATH not found for key string containing valies :" +requestProperties.toString());
+		}
+		return path;
 	}
 
 	public abstract URL getRequestQueryUrl(String method) throws UnsupportedEncodingException, MalformedURLException;
@@ -408,4 +415,7 @@ public abstract class AAIRequest {
 	    return query_pairs;
 	}
 
+	protected boolean expectsDataFromPUTRequest() {
+		return false;
+	}
 }

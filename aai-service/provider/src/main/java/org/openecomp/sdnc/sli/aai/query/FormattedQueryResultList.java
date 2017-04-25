@@ -19,10 +19,41 @@
  * ============LICENSE_END=========================================================
  */
 
-package org.openecomp.sdnc.sli.aai.data;
+package org.openecomp.sdnc.sli.aai.query;
 
-public interface ResourceVersion {
+import java.util.List;
 
-	public String getResourceVersion();
-	public void setResourceVersion(String resourceVersion);
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
+
+import org.openecomp.sdnc.sli.aai.data.AAIDatum;
+
+@XmlAccessorType(XmlAccessType.FIELD)
+@XmlType(name = "", propOrder = {
+    "results"
+})
+@XmlRootElement(name = "result-list")
+public class FormattedQueryResultList implements AAIDatum {
+
+	@XmlElement(name = "results")
+	private List<Results> results;
+	@XmlElement(name = "results")
+    public List<Results> getResults ()
+    {
+        return results;
+    }
+    @XmlElement(name = "results")
+    public void setResults (List<Results> results)
+    {
+        this.results = results;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "ClassPojo [results = "+results+"]";
+    }
 }

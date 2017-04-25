@@ -3,7 +3,7 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- * 						reserved.
+ * 							reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 
 package org.openecomp.sdnc.sli.aai;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -51,11 +52,16 @@ import org.openecomp.sdnc.sli.SvcLogicContext;
 import org.openecomp.sdnc.sli.SvcLogicException;
 import org.openecomp.sdnc.sli.aai.AAIService.AAIRequestExecutor;
 import org.openecomp.sdnc.sli.aai.data.AAIDatum;
+import org.openecomp.sdnc.sli.aai.query.FormattedQueryResultList;
 import org.openecomp.sdnc.sli.aai.query.InstanceFilter;
 import org.openecomp.sdnc.sli.aai.query.InstanceFilters;
 import org.openecomp.sdnc.sli.aai.query.NamedQuery;
 import org.openecomp.sdnc.sli.aai.query.NamedQueryData;
 import org.openecomp.sdnc.sli.aai.query.QueryParameters;
+import org.openecomp.sdnc.sli.aai.query.Results;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.openecomp.aai.inventory.v10.*;
@@ -377,6 +383,7 @@ public abstract class AAIDeclarations implements AAIClient {
 	private boolean checkOldFormat(String resource, HashMap<String, String> nameValues) {
 
 		switch(resource){
+		case "formatted-query":
 		case "generic-query":
 		case "named-query":
 		case "nodes-query":
@@ -413,11 +420,10 @@ public abstract class AAIDeclarations implements AAIClient {
 			if(entity instanceof ArrayList) {
 				writeList((ArrayList<?>)entity, prefix + "." + mapKey, ctx);
 			} else
-			if(entity instanceof String) {
+			if(entity instanceof String ||  entity instanceof Long || entity instanceof Integer || entity instanceof Boolean) {
 				ctx.setAttribute(prefix + "." + mapKey, entity.toString());
 				getLogger().debug(prefix + "." + mapKey + " : " + entity.toString());
-			} else
-			if(entity instanceof Map) {
+			} else if(entity instanceof Map) {
 				String localPrefix = prefix;
 				if(mapKey != null) {
 					localPrefix = String.format("%s.%s", prefix, mapKey);
@@ -433,7 +439,7 @@ public abstract class AAIDeclarations implements AAIClient {
 			if(entity instanceof Map) {
 				writeMap( (Map<String, Object>)entity,  prefix + "[" + i + "]",  ctx);
 			} else
-			if(entity instanceof String) {
+				if(entity instanceof String ||  entity instanceof Long || entity instanceof Integer || entity instanceof Boolean) {
 				ctx.setAttribute(prefix, entity.toString());
 				getLogger().debug(prefix  + " : " + entity.toString());
 			}
@@ -524,13 +530,9 @@ public abstract class AAIDeclarations implements AAIClient {
 					request.setRequestObject(instance);
 					request.processRequestPathValues(nameValues);
 
-					if(getExecutor().post(request) == true) {
+					getExecutor().post(request);
 						getLogger().debug("Save relationship list - returning SUCCESS");
 						return QueryStatus.SUCCESS;
-					} else {
-						getLogger().debug("Save relationship list - returning FAILURE");
-						return QueryStatus.FAILURE;
-					}
 				}
 			} catch (Exception exc) {
 				ctx.setAttribute(prefix + ".error.message", exc.getMessage());
@@ -833,6 +835,33 @@ public abstract class AAIDeclarations implements AAIClient {
 					request.setRequestObject(extractNamedQueryDataFromQueryPrefix(nameValues, params));
 			}
 			String rv = getExecutor().get(request);
+
+			retval = processResponseData(rv, resource, request, prefix,  ctx, nameValues, modifier);
+
+		} catch(AAIServiceException aaiexc) {
+			int errorCode = aaiexc.getReturnCode();
+			ctx.setAttribute(prefix + ".error.message", aaiexc.getMessage());
+			if(errorCode >= 300) {
+				ctx.setAttribute(prefix + ".error.http.response-code", "" + aaiexc.getReturnCode());
+			}
+
+			if(aaiexc.getReturnCode() == 404)
+				return QueryStatus.NOT_FOUND;
+
+			return QueryStatus.FAILURE;
+		} catch (Exception exc) {
+			getLogger().warn("requestGenericVnfData", exc);
+			ctx.setAttribute(prefix + ".error.message", exc.getMessage());
+			return QueryStatus.FAILURE;
+		}
+
+		return retval;
+	}
+
+	public QueryStatus processResponseData(String rv, String resource, AAIRequest request, String prefix,  SvcLogicContext ctx, HashMap<String, String> nameValues, String modifier) throws JsonParseException, JsonMappingException, IOException, AAIServiceException
+	{
+		Object response = null;
+
 			if(rv == null) {
 				return QueryStatus.NOT_FOUND;
 			}
@@ -879,8 +908,15 @@ public abstract class AAIDeclarations implements AAIClient {
 				}
 				ResultData rDatum = rdList.get(0);
 				response = rDatum;
-//				writeList((ArrayList)rdList, prefix, ctx);
 			}
+
+		if("formatted-query".equals(resource)) {
+			FormattedQueryResultList rd = FormattedQueryResultList.class.cast(response);
+			List<Results> iRIlist = rd.getResults();
+			if(iRIlist == null || iRIlist.isEmpty()) {
+				return QueryStatus.NOT_FOUND;
+			}
+		}
 
 			String preFix = null;
 			if(prefix == null || prefix.isEmpty()) {
@@ -960,11 +996,6 @@ public abstract class AAIDeclarations implements AAIClient {
 		    		continue;
 		    	}
 
-//		    	if("subnets".equals(theKey)){
-//		    		Map<String, Object> subnetsList = (Map<String, Object>)value;
-//		    		writeMap(subnetsList, String.format("%s.%s", prefix, theKey), ctx);
-//		    	}
-
 	    		if(value instanceof Map) {
 	    			Map<String, Object> subnetsList = (Map<String, Object>)value;
 	    			writeMap(subnetsList, String.format("%s.%s", prefix, theKey), ctx);
@@ -972,24 +1003,7 @@ public abstract class AAIDeclarations implements AAIClient {
 	    		}
 
 		    }
-		} catch(AAIServiceException aaiexc) {
-			int errorCode = aaiexc.getReturnCode();
-			ctx.setAttribute(prefix + ".error.message", aaiexc.getMessage());
-			if(errorCode >= 300) {
-				ctx.setAttribute(prefix + ".error.http.response-code", "" + aaiexc.getReturnCode());
-			}
-
-			if(aaiexc.getReturnCode() == 404)
-				return QueryStatus.NOT_FOUND;
-
-			return QueryStatus.FAILURE;
-		} catch (Exception exc) {
-			getLogger().warn("requestGenericVnfData", exc);
-			ctx.setAttribute(prefix + ".error.message", exc.getMessage());
-			return QueryStatus.FAILURE;
-		}
-
-		return retval;
+	    return QueryStatus.SUCCESS;
 	}
 
 
@@ -1132,6 +1146,21 @@ public abstract class AAIDeclarations implements AAIClient {
 										Throwable cause = x.getCause();
 										getLogger().warn("Failed process for " + resourceClass.getName(), x);
 									}
+								} else if(type.getName().equals("java.util.List")) {
+									List<String> newValues = new ArrayList<String>();
+									String length = id+"_length";
+									if(!parms.isEmpty() && parms.containsKey(length)) {
+										String tmp = parms.get(length).toString();
+										int count = Integer.valueOf(tmp);
+										for(int i=0; i<count; i++) {
+											String tmpValue = parms.get(String.format("%s[%d]", id, i));
+											newValues.add(tmpValue);
+										}
+										if(!newValues.isEmpty()) {
+											Object o = setter.invoke(instance, newValues);
+										}
+									}
+									set.remove(id);
 								} else {
 									setters.put(id, setter);
 								}
@@ -1407,7 +1436,15 @@ public abstract class AAIDeclarations implements AAIClient {
 
 			request.processRequestPathValues(nameValues);
 			request.setRequestObject(instance);
-			getExecutor().post(request);
+				Object response = getExecutor().post(request);
+				if(request.expectsDataFromPUTRequest()){
+					if(response != null && response instanceof String) {
+						String rv = response.toString();
+						QueryStatus retval = processResponseData(rv, resource, request, prefix,  ctx, nameValues, null);
+						getLogger().debug("newModelSave - returning " + retval.toString());
+						return retval;
+					}
+				}
 
 		} catch(AAIServiceException exc){
 			ctx.setAttribute(prefix + ".error.message", exc.getMessage());
@@ -1965,23 +2002,23 @@ public abstract class AAIDeclarations implements AAIClient {
 							insf.setPnf(pnf);
 							data.getInstanceFilters().getInstanceFilter().add(insf);
 
-//						} else if("service-instance".equals(split[0])) {
-//							ServiceInstance serviceInstance = new ServiceInstance();
-//							serviceInstance.setServiceInstanceId(value);
-//
-//							InstanceFilter insf = new InstanceFilter();
-//							insf.setServiceInstance(serviceInstance);
-//							data.getInstanceFilters().getInstanceFilter().add(insf);
+						} else if("service-instance".equals(split[0])) {
+							ServiceInstance serviceInstance = new ServiceInstance();
+							serviceInstance.setServiceInstanceId(value);
 
-//						} else if("l3-network".equals(split[0])) {
-//							L3Network l3Network = new L3Network();
-//							if("network-role".equals(split[1])) {
-//								l3Network.setNetworkRole(value);
-//							}
-//
-//							InstanceFilter insf = new InstanceFilter();
-//							insf.setL3Network(l3Network);
-//							data.getInstanceFilters().getInstanceFilter().add(insf);
+							InstanceFilter insf = new InstanceFilter();
+							insf.setServiceInstance(serviceInstance);
+							data.getInstanceFilters().getInstanceFilter().add(insf);
+
+						} else if("l3-network".equals(split[0])) {
+							L3Network l3Network = new L3Network();
+							if("network-role".equals(split[1])) {
+								l3Network.setNetworkRole(value);
+							}
+
+							InstanceFilter insf = new InstanceFilter();
+							insf.setL3Network(l3Network);
+							data.getInstanceFilters().getInstanceFilter().add(insf);
 						}
 					}
 				}
