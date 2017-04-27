@@ -3,14 +3,14 @@
  * openECOMP : SDN-C
  * ================================================================================
  * Copyright (C) 2017 AT&T Intellectual Property. All rights
- * 						reserved.
+ * 							reserved.
  * ================================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -389,6 +389,7 @@ public class SqlResource implements SvcLogicResource, SvcLogicJavaPlugin {
 			// If printable, not encrypted
 			return (strValue);
 		} else {
+			PreparedStatement stmt = null;
 			Connection conn = null;
 			ResultSet results = null;
 			try {
@@ -399,7 +400,7 @@ public class SqlResource implements SvcLogicResource, SvcLogicJavaPlugin {
 				// null, null);
 				conn = ((DBResourceManager) dblibSvc).getConnection();
 
-				PreparedStatement stmt = conn.prepareStatement("SELECT CAST(AES_DECRYPT(?, ?) AS CHAR(50)) FROM DUAL");
+				stmt = conn.prepareStatement("SELECT CAST(AES_DECRYPT(?, ?) AS CHAR(50)) FROM DUAL");
 
 				stmt.setBytes(1, colValue);
 				stmt.setString(2, getCryptKey());
@@ -423,6 +424,16 @@ public class SqlResource implements SvcLogicResource, SvcLogicJavaPlugin {
 				} catch (Exception exc) {
 
 				}
+
+				try {
+					if (stmt != null) {
+						stmt.close();
+						stmt = null;
+					}
+				} catch (Exception exc) {
+
+				}
+
 				try {
 					if (conn != null) {
 						conn.close();
@@ -431,6 +442,7 @@ public class SqlResource implements SvcLogicResource, SvcLogicJavaPlugin {
 				} catch (Exception exc) {
 
 				}
+
 			}
 		}
 		return (strValue);
