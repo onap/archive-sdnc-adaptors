@@ -122,9 +122,6 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 
 	private final String vnf_image_query_path;
 
-	private final String param_format;  				//= "filter=%s:%s";
-	private final String param_vnf_type;				//= "vnf-type";
-	private final String param_physical_location_id; 	//= "physical-location-id";
 	private final String param_service_type;			//= "service-type";
 
 	private final String ubb_notify_path;
@@ -231,9 +228,6 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		svc_inst_qry_path	= props.getProperty(SVC_INST_QRY_PATH); // "/aai/v1/search/generic-query?key=service-instance.service-instance-id:{svc-instance-id}&start-node-type=service-instance&include=service-instance");
 
 
-		param_format 		= props.getProperty(QUERY_FORMAT, "filter=%s:%s");
-		param_vnf_type 		= props.getProperty(PARAM_VNF_TYPE, "vnf-type");
-		param_physical_location_id = props.getProperty(PARAM_PHYS_LOC_ID, "physical-location-id");
 		param_service_type 	= props.getProperty(PARAM_SERVICE_TYPE, "service-type");
 
 		// P-Interfaces
@@ -383,67 +377,6 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
         return con;
 	}
 
-	/* (non-Javadoc)
-	 * @see org.openecomp.sdnc.sli.resource.aic.AnAIClient#requestSdnZoneQuery(java.lang.String, java.lang.String, java.lang.String)
-	 */
-	@Override
-	public SdnZoneResponse requestSdnZoneQuery(String service_type, String vnf_type, String physical_location) throws AAIServiceException {
-		SdnZoneResponse response = null;
-		InputStream inputStream = null;
-
-		try {
-			URL http_req_url =	getRequestURL(service_type, vnf_type, physical_location);
-
-            HttpURLConnection con = getConfiguredConnection(http_req_url, HttpMethod.GET);
-
-            LOGwriteFirstTrace(HttpMethod.GET, http_req_url.toString());
-            LOGwriteDateTrace("service_type", service_type);
-            LOGwriteDateTrace("vnf_type", vnf_type);
-            LOGwriteDateTrace("physical_location", physical_location);
-
-            // Check for errors
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-            	inputStream = con.getInputStream();
-            } else {
-            	inputStream = con.getErrorStream();
-            }
-
-            // Process the response
-            LOG.debug("HttpURLConnection result:" + responseCode);
-            if(inputStream == null) inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-            BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) );
-
-            ObjectMapper mapper = getObjectMapper();
-
-			if (responseCode == HttpURLConnection.HTTP_OK) {
-            	response = mapper.readValue(reader, SdnZoneResponse.class);
-            	LOGwriteEndingTrace(HttpURLConnection.HTTP_OK, "SUCCESS", mapper.writeValueAsString(response));
-			} else if(responseCode == HttpURLConnection.HTTP_NOT_FOUND ) {
-            	LOGwriteEndingTrace(responseCode, "HTTP_NOT_FOUND", "Entry does not exist.");
-            	return response;
-            } else {
-            	ErrorResponse errorresponse = mapper.readValue(reader, ErrorResponse.class);
-            	LOGwriteEndingTrace(responseCode, "FAILURE", mapper.writeValueAsString(errorresponse));
-            	throw new AAIServiceException(responseCode, errorresponse);
-            }
-
-		} catch(AAIServiceException aaiexc) {
-			throw aaiexc;
-		} catch (Exception exc) {
-			LOG.warn("requestServiceInterfaceData", exc);
-			throw new AAIServiceException(exc);
-		} finally {
-			if(inputStream != null){
-				try {
-					inputStream.close();
-				} catch(Exception exc) {
-
-				}
-			}
-		}
-		return response;
-	}
 
 	@Override
 	public GenericVnf requestGenericVnfData(String vnf_id) throws AAIServiceException {
@@ -675,22 +608,6 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 		}
 	}
 
-	/*
-	 * Supporting methosd
-	 */
-	private URL getRequestURL(String service_type, String vnf_type, String physical_location_id) throws MalformedURLException, URISyntaxException, UnsupportedEncodingException {
-
-		StringBuilder query = new StringBuilder();
-		query.append("filter=vnf-type:").append(encodeQuery(vnf_type));
-		query.append("&filter=service-type:").append(encodeQuery(service_type));
-		query.append("&filter=physical-location-id:").append(physical_location_id);
-
-		UriBuilder builder = javax.ws.rs.core.UriBuilder.fromUri(target_uri).path(query_path).replaceQuery(query.toString());
-//		String y = x.build().toString();
-
-		return builder.build().toURL();
-
-	}
 
 	private static Properties initialize(URL url ) throws ConfigurationException {
 
@@ -3180,7 +3097,7 @@ public class AAIService extends AAIDeclarations implements AAIClient, SvcLogicRe
 	}
 
 	public void logMetricResponse(String requestId, int responseCode, String responseDescription){
-		ml.logResponse(responseCode < 400 ? "SUCCESS" : "FAILURE", Integer.toBinaryString(responseCode), responseDescription);
+		ml.logResponse(responseCode < 400 ? "SUCCESS" : "FAILURE", Integer.toString(responseCode), responseDescription);
 	}
 
 	public void logKeyError(String keys){

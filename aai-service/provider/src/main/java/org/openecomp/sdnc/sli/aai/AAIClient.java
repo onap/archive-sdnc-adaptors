@@ -41,9 +41,6 @@ import org.openecomp.aai.inventory.v10.*;
 
 public interface AAIClient extends SvcLogicResource, SvcLogicJavaPlugin {
 
-	// Availability Zone
-	public SdnZoneResponse requestSdnZoneQuery(String service_type,	String vnf_type, String physical_location) throws AAIServiceException;
-
 	// VCE
 	public boolean postNetworkVceData(String vnf_id, Vce request) throws AAIServiceException;
 	public Vce requestNetworkVceData(String vnf_id) throws AAIServiceException;

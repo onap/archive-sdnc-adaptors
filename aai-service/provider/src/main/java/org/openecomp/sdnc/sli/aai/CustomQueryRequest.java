@@ -37,16 +37,16 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 
-public class FormattedQueryRequest extends AAIRequest {
+public class CustomQueryRequest extends AAIRequest {
 
-	public static final String GENERIC_SEARCH_PATH			= "com.att.sdnctl.sli.aai.query.generic";
+	public static final String GENERIC_SEARCH_PATH			= "org.openecomp.sdnc.sli.aai.query.generic";
 
 	private final String generic_search_path;
 
 	public static final String FORMAT = "format";
 
 
-	public FormattedQueryRequest() {
+	public CustomQueryRequest() {
 		String tmp_generic_search_path = configProperties.getProperty(GENERIC_SEARCH_PATH);
 		tmp_generic_search_path = tmp_generic_search_path.split("search")[0];
 		generic_search_path = tmp_generic_search_path +"query";

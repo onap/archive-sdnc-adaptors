@@ -100,9 +100,6 @@ public abstract class AAIDeclarations implements AAIClient {
 
 	public static final String VNF_IMAGE_QUERY_PATH	  = "org.openecomp.sdnc.sli.aai.path.vnf.image.query";
 
-	public static final String QUERY_FORMAT           = "org.openecomp.sdnc.sli.aai.param.format";
-	public static final String PARAM_VNF_TYPE         = "org.openecomp.sdnc.sli.aai.param.vnf_type";
-	public static final String PARAM_PHYS_LOC_ID      = "org.openecomp.sdnc.sli.aai.param.physical.location.id";
 	public static final String PARAM_SERVICE_TYPE     = "org.openecomp.sdnc.sli.aai.param.service.type";
 	public static final String CERTIFICATE_HOST_ERROR = "org.openecomp.sdnc.sli.aai.host.certificate.ignore";
 

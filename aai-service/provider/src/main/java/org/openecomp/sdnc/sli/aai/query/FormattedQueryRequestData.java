@@ -76,4 +76,8 @@ public class FormattedQueryRequestData implements AAIDatum {
         return " [start = "+start+", query = "+query+"]";
     }
 
+    public String getResourceVersion() {
+        return null;
+    }
+
 }

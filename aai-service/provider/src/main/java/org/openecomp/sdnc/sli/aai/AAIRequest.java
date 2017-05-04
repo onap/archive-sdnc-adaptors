@@ -113,8 +113,8 @@ public abstract class AAIRequest {
 			return new NamedQueryRequest();
 		case "nodes-query":
 			return new NodesQueryRequest();
-		case "formatted-query":
-			return new FormattedQueryRequest();
+		case "custom-query":
+			return new CustomQueryRequest();
 		case "linterface":
 			return new LInterfaceRequest(LInterfaceRequest.TYPE.L2_BRIDGE_SBG);
 		case "l2-bridge-sbg":
