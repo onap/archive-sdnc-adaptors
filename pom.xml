@@ -38,7 +38,7 @@
 	<distributionManagement>
 		<site>
 			<id>sdnc-javadoc</id>
-			<url>dav:https://${openecomp.nexus.host}:${openecomp.nexus.port}/repository/sdn-c-javadoc/${project.artifactId}/${project.version}</url>
+			<url>dav:https://${openecomp.nexus.host}/content/sites/site/org/onap/sdnc/adaptors/${project.artifactId}/${project.version}</url>
 		</site>
 	</distributionManagement>
 
