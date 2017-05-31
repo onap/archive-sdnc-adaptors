@@ -86,6 +86,8 @@ public class ConfigResource implements SvcLogicResource {
 
 		String urlString = "restconf/config/" + module + ":" + restQueryStr;
 
+                LOG.info("Querying resource: " + resource + ". At URL: " + urlString);
+
 		Document results = restService.get(urlString);
 
 

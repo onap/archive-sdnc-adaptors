@@ -88,6 +88,8 @@ public class OperationalResource implements SvcLogicResource {
 
 		String urlString = "restconf/operational/" + module + ":" + restQueryStr;
 
+                LOG.info("Querying resource: " + resource + ". At URL: " + urlString);
+
 		Document results = restService.get(urlString);
 
 
