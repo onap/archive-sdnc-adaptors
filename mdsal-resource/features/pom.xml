@@ -4,7 +4,7 @@
 	<parent>
 		<artifactId>mdsal-resource</artifactId>
 		<groupId>org.openecomp.sdnc.adaptors</groupId>
-		<version>1.1.1-SNAPSHOT</version>
+		<version>1.1.2-SNAPSHOT</version>
 	</parent>
 	<artifactId>mdsal-resource-features</artifactId>
 	<name>MD-SAL Resource Adaptor - Features</name>

@@ -4,7 +4,7 @@
 	<parent>
 		<artifactId>resource-assignment</artifactId>
 		<groupId>org.openecomp.sdnc.adaptors</groupId>
-		<version>1.1.1-SNAPSHOT</version>
+		<version>1.1.2-SNAPSHOT</version>
 	</parent>
 	<artifactId>resource-assignment-installer</artifactId>
 	<name>Resource allocator- Karaf  Installer</name>

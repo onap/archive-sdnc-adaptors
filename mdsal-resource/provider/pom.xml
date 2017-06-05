@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.openecomp.sdnc.adaptors</groupId>
 		<artifactId>mdsal-resource</artifactId>
-		<version>1.1.1-SNAPSHOT</version>
+		<version>1.1.2-SNAPSHOT</version>
 	</parent>
 	<artifactId>mdsal-resource-provider</artifactId>
 	<packaging>bundle</packaging>
