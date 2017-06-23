@@ -31,7 +31,7 @@
         <feature>sdnc-sli</feature>
         <feature>sdnc-dblib</feature>
         <feature>spring</feature>
-        <feature>spring-jdbc</feature>
+        <feature version="[3.1,4)">spring-jdbc</feature>
         <feature>spring-dm</feature>
         <bundle start-level="88">mvn:org.openecomp.sdnc.adaptors/resource-assignment-provider/${project.version}</bundle>
         <bundle>mvn:mysql/mysql-connector-java/${mysql.connector.version}</bundle>
