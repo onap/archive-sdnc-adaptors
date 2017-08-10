@@ -31,7 +31,7 @@ import org.openecomp.sdnc.sli.aai.data.AAIDatum;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v10.L3InterfaceIpv4AddressList;
+import org.openecomp.aai.inventory.v11.L3InterfaceIpv4AddressList;
 
 public class L3InterfaceIpv4AddressListRequest extends AAIRequest {
 

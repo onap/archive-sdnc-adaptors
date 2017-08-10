@@ -22,6 +22,7 @@
 package org.openecomp.sdnc.sli.aai;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,7 +38,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 
 
-import org.openecomp.aai.inventory.v10.*;
+import org.openecomp.aai.inventory.v11.*;
 
 public interface AAIClient extends SvcLogicResource, SvcLogicJavaPlugin {
 
@@ -197,5 +198,7 @@ public interface AAIClient extends SvcLogicResource, SvcLogicJavaPlugin {
 	public void logKeyError(String keys);
 
 	public QueryStatus processResponseData(String rv, String resource, AAIRequest request, String prefix,  SvcLogicContext ctx, HashMap<String, String> nameValues, String modifier) throws JsonParseException, JsonMappingException, IOException, AAIServiceException ;
+	public String getPathTemplateForResource(String resoourceName, String join, SvcLogicContext ctx) throws MalformedURLException;
+	public boolean isDeprecatedFormat(String resource, HashMap<String, String> nameValues);
 
 }

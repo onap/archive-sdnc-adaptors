@@ -31,7 +31,7 @@ import org.openecomp.sdnc.sli.aai.data.AAIDatum;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v10.GenericVnf;
+import org.openecomp.aai.inventory.v11.GenericVnf;
 
 public class GenericVnfRequest extends AAIRequest {
 

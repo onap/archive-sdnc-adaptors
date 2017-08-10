@@ -34,7 +34,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 
-import org.openecomp.aai.inventory.v10.CloudRegion;
+import org.openecomp.aai.inventory.v11.CloudRegion;
 
 public class CloudRegionRequest extends AAIRequest {
 

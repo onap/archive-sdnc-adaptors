@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.openecomp.aai.inventory.v10.PInterface;
+import org.openecomp.aai.inventory.v11.PInterface;
 
 public class PInterfaceRequest extends AAIRequest {
 

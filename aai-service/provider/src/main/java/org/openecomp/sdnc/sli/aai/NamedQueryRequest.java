@@ -42,7 +42,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationIntrospector;
 
-import org.openecomp.aai.inventory.v10.InventoryResponseItems;
+import org.openecomp.aai.inventory.v11.InventoryResponseItems;
 
 public class NamedQueryRequest extends AAIRequest {
 
