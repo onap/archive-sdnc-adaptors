@@ -13,7 +13,7 @@
 	<groupId>org.openecomp.sdnc.adaptors</groupId>
 	<artifactId>sdnc-adaptors</artifactId>
 
-	<name>SDN-C Adaptors</name>
+	<name>sdnc-adaptors</name>
 	<url>https://wiki.openecomp.org</url>
 	<description>The SDN-C core components contains the SLI, dblib and root pom</description>
 
